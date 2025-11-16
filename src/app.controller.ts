@@ -9,4 +9,14 @@ export class AppController {
   getHello(): string {
     return this.appService.getHello();
   }
+
+  @Get('health')
+  healthCheck() {
+    return {
+      status: 'ok',
+      service: 'Leaves Subsystem',
+      timestamp: new Date().toISOString(),
+      message: 'Leaves Management System is running',
+    };
+  }
 }
