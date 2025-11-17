@@ -6,6 +6,8 @@ import { AppService } from './app.service';
 import databaseConfig from './config/database.config';
 import jwtConfig from './config/jwt.config';
 import { LeaveTypesModule } from './modules/leave-types/leave-types.module';
+import { VacationPackagesModule } from './modules/vacation-packages/vacation-packages.module';
+import { OrganizationCalendarModule } from './modules/organization-calendar/organization-calendar.module';
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { LeaveTypesModule } from './modules/leave-types/leave-types.module';
     }),
 
     LeaveTypesModule,
+    VacationPackagesModule,
+    OrganizationCalendarModule,
   ],
   controllers: [AppController],
   providers: [AppService],
