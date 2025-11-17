@@ -5,11 +5,11 @@ export type LeaveRequestDocument = LeaveRequest & Document;
 
 @Schema({ timestamps: true })
 export class LeaveRequest {
-  @Prop({ type: String, required: true })
-  employeeId: string;
+  @Prop({ type: Types.ObjectId, required: true })
+  employeeId: Types.ObjectId;
 
-  @Prop({ type: String, required: true })
-  leaveType: string; // e.g. ANNUAL, SICK
+  @Prop({ required: true })
+  leaveTypeCode: string; // e.g. ANNUAL, SICK
 
   @Prop({ type: Date, required: true })
   startDate: Date;
@@ -24,16 +24,16 @@ export class LeaveRequest {
   documentUrl?: string;
 
   @Prop({ default: 'pending' })
-  status: string;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
 
   @Prop()
-  managerId?: string;
+  managerId?: Types.ObjectId;
 
   @Prop()
-  hrAdminId?: string;
+  hrAdminId?: Types.ObjectId;
 
-  @Prop({ type: Array, default: [] })
-  auditTrail: any[];
+  @Prop({ default: [] })
+  auditTrail: Array<any>;
 }
 
 export const LeaveRequestSchema = SchemaFactory.createForClass(LeaveRequest);

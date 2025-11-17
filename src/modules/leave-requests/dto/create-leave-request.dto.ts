@@ -1,17 +1,19 @@
 import { IsDateString, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CreateLeaveRequestDto {
-  @IsString()
   @IsNotEmpty()
+  @IsString()
   employeeId: string;
 
-  @IsString()
   @IsNotEmpty()
-  leaveType: string;
+  @IsString()
+  leaveTypeCode: string;
 
+  @IsNotEmpty()
   @IsDateString()
   startDate: string;
 
+  @IsNotEmpty()
   @IsDateString()
   endDate: string;
 
