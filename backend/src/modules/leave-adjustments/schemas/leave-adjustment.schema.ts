@@ -1,30 +1,30 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
 
-export type LeaveAdjustmentDocument = LeaveAdjustment & Document;
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { HydratedDocument, Types } from 'mongoose';
+import { AdjustmentType } from '../enums/adjustment-type.enum';
+
+export type LeaveAdjustmentDocument = HydratedDocument<LeaveAdjustment>;
 
 @Schema({ timestamps: true })
 export class LeaveAdjustment {
-  @Prop({ type: Types.ObjectId, required: true })
+  @Prop({ type: Types.ObjectId, ref: 'Employee', required: true })
   employeeId: Types.ObjectId;
 
-  @Prop({ required: true })
-  leaveTypeCode: string;
+  @Prop({ type: Types.ObjectId, ref: 'LeaveType', required: true })
+  leaveTypeId: Types.ObjectId;
+
+  @Prop({ enum: AdjustmentType, required: true })
+  adjustmentType: AdjustmentType;
 
   @Prop({ required: true })
-  days: number; // positive or negative
+  amount: number;
 
-  @Prop()
-  reason?: string;
+  @Prop({ required: true })
+  reason: string;
 
-  @Prop({ default: 'pending' })
-  status: 'pending' | 'approved' | 'rejected';
-
-  @Prop()
-  approverId?: Types.ObjectId;
-
-  @Prop({ default: [] })
-  auditTrail: Array<any>;
+  @Prop({ type: Types.ObjectId, ref: 'Employee', required: true })
+  hrUserId: Types.ObjectId;
 }
 
-export const LeaveAdjustmentSchema = SchemaFactory.createForClass(LeaveAdjustment);
+export const LeaveAdjustmentSchema =
+  SchemaFactory.createForClass(LeaveAdjustment);
