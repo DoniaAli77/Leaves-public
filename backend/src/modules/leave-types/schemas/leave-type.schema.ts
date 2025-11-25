@@ -1,61 +1,41 @@
+
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { HydratedDocument, Types } from 'mongoose';
+import { AttachmentType } from '../enums/attachment-type.enum';
 
-export type LeaveTypeDocument = LeaveType & Document;
-
-export enum LeaveCategory {
-  PAID = 'PAID',
-  UNPAID = 'UNPAID',
-  DEDUCTIBLE = 'DEDUCTIBLE',
-  NON_DEDUCTIBLE = 'NON_DEDUCTIBLE',
-}
-
-export enum Gender {
-  ALL = 'ALL',
-  MALE = 'MALE',
-  FEMALE = 'FEMALE',
-}
+export type LeaveTypeDocument = HydratedDocument<LeaveType>;
 
 @Schema({ timestamps: true })
 export class LeaveType {
-  @Prop({ required: true, unique: true, trim: true })
+  @Prop({ required: true, unique: true })
   code: string;
 
-  @Prop({ required: true, trim: true })
+  @Prop({ required: true })
   name: string;
 
-  @Prop({ required: true, enum: LeaveCategory })
-  category: LeaveCategory;
+  @Prop({ type: Types.ObjectId, ref: 'LeaveCategory', required: true })
+  categoryId: Types.ObjectId;
 
-  @Prop({ default: false })
-  requiresDocument: boolean;
-
-  @Prop({ type: String })
-  documentType: string;
-
-  @Prop({ type: Number })
-  maxDaysPerYear: number;
-
-  @Prop({ type: Number })
-  maxConsecutiveDays: number;
-
-  @Prop({ type: Number, default: 0 })
-  minDaysNotice: number;
-
-  @Prop({ default: false })
-  allowPartialDays: boolean;
-
-  @Prop({ required: true, enum: Gender, default: Gender.ALL })
-  gender: Gender;
+  @Prop()
+  description?: string;
 
   @Prop({ default: true })
-  isActive: boolean;
+  paid: boolean;
 
-  @Prop({ trim: true })
-  payrollPayCode: string;
+  @Prop({ default: true })
+  deductible: boolean;
 
-  @Prop({ type: String })
-  description: string;
+  @Prop({ default: false })
+  requiresAttachment: boolean;
+
+  @Prop({ enum: AttachmentType })
+  attachmentType?: AttachmentType;
+
+  @Prop({ default: null })
+  minTenureMonths?: number;
+
+  @Prop({ default: null })
+  maxDurationDays?: number;
 }
 
 export const LeaveTypeSchema = SchemaFactory.createForClass(LeaveType);
