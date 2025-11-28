@@ -89,24 +89,43 @@ export class IntegrationService {
     };
   }
 
-  async blockAttendance(
-    request: LeaveBlockRequest,
-  ): Promise<LeaveBlockResponse> {
-    const diffTime =
-      request.endDate.getTime() - request.startDate.getTime();
-    const blockedDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  // async blockAttendance(
+  //   request: LeaveBlockRequest,
+  // ): Promise<LeaveBlockResponse> {
+  //   const diffTime =
+  //     request.endDate.getTime() - request.startDate.getTime();
+  //   const blockedDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
-    return {
-      success: true,
-      data: {
-        blockId: `block_${Date.now()}`,
-        employeeId: request.employeeId,
-        startDate: request.startDate,
-        endDate: request.endDate,
-        blockedDays,
-      },
-    };
-  }
+  //   return {
+  //     success: true,
+  //     data: {
+  //       blockId: `block_${Date.now()}`,
+  //       employeeId: request.employeeId,
+  //       startDate: request.startDate,
+  //       endDate: request.endDate,
+  //       blockedDays,
+  //     },
+  //   };
+  // }
+  async blockAttendance(request: LeaveBlockRequest): Promise<LeaveBlockResponse> {
+  const startDate = new Date(request.startDate);
+  const endDate = new Date(request.endDate);
+
+  const diffTime = endDate.getTime() - startDate.getTime();
+  const blockedDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+  return {
+    success: true,
+    data: {
+      blockId: `block_${Date.now()}`,
+      employeeId: request.employeeId,
+      startDate: startDate,
+      endDate: endDate,
+      blockedDays,
+    },
+  };
+}
+
 
   async unblockAttendance(leaveRequestId: string): Promise<any> {
     return {
