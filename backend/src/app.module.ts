@@ -5,18 +5,27 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import databaseConfig from './config/database.config';
 import jwtConfig from './config/jwt.config';
-import { LeaveTypesModule } from './modules/leave-types/leave-types.module';
-import { VacationPackagesModule } from './modules/vacation-packages/vacation-packages.module';
-import { OrganizationCalendarModule } from './modules/organization-calendar/organization-calendar.module';
+
+// --- Feature Modules (Based on your file explorer) ---
+import { LeaveTypesModule } from './models/leave-types/leave-types.module';
+import { LeavePoliciesModule } from './models/leave-policies/leave-policies.module'; // Replaces VacationPackages
+import { LeaveRequestsModule } from './models/leave-requests/leave-requests.module';
+import { LeaveEntitlementsModule } from './models/leave-entitlements/leave-entitlements.module';
+import { LeaveAdjustmentsModule } from './models/leave-adjustments/leave-adjustments.module';
+import { OrganizationCalendarModule } from './models/organization-calendar/organization-calendar.module';
+import { IntegrationModule } from './models/integration/integration.module';
+
 
 @Module({
   imports: [
+    // 1. Configuration
     ConfigModule.forRoot({
       isGlobal: true,
       load: [databaseConfig, jwtConfig],
       envFilePath: '.env',
     }),
 
+    // 2. Database
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
@@ -27,13 +36,16 @@ import { OrganizationCalendarModule } from './modules/organization-calendar/orga
       inject: [ConfigService],
     }),
 
+    // 3. Feature Modules
     LeaveTypesModule,
-    VacationPackagesModule,
+    LeavePoliciesModule,
+    LeaveRequestsModule,
+    LeaveEntitlementsModule,
+    LeaveAdjustmentsModule,
     OrganizationCalendarModule,
+    IntegrationModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule {}
-
-
