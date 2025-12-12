@@ -1,6 +1,7 @@
 import axiosInstance from "@/utils/axiosInstance";
 
 export const leavePolicyAPI = {
+  
   getAll: () => axiosInstance.get("/leave-policy"),
 
   getOne: (id: string) => axiosInstance.get(`/leave-policy/${id}`),
