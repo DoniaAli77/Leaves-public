@@ -65,6 +65,24 @@ export class LeavesService {
     private calendarModel: Model<CalendarDocument>,
   ) {}
 
+
+  leaveCategory = {
+  create: async (dto) => {
+    return new this.leaveCategoryModel(dto).save();
+  },
+
+  findAll: async () => this.leaveCategoryModel.find().exec(),
+
+  update: async (id, dto) => {
+    return this.leaveCategoryModel.findByIdAndUpdate(id, dto, { new: true }).exec();
+  },
+
+  remove: async (id) => {
+    return this.leaveCategoryModel.findByIdAndDelete(id).exec();
+  },
+};
+
+
   // ============================================================
   // LEAVE TYPE
   // ============================================================
