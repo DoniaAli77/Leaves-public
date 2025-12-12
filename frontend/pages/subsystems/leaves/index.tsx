@@ -16,7 +16,7 @@ export default function LeavesHome() {
       title: "Leave Types",
       desc: "Define and manage all leave categories such as annual, sick, unpaid, and more.",
       icon: <FileEdit className="w-8 h-8" />,
-      link: "/subsystems/leaves/leave-types",
+      link: "/subsystems/leaves/types",
       gradient: "from-blue-500 to-cyan-500",
     },
     {
