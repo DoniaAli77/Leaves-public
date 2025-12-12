@@ -1,8 +1,10 @@
-// pages/subsystems/leaves/types/index.tsx
 import React, { useEffect, useState } from "react";
+import { FiMenu } from "react-icons/fi";
+
 import LeaveCard from "@/components/leaves/cards/LeaveCard";
 import LeaveTypeForm from "@/components/leaves/forms/LeaveTypeForm";
 import DeleteConfirmModal from "@/components/leaves/modals/DeleteConfirmModal";
+import CategoryDrawer from "@/components/leaves/modals/CategoryDrawer";
 
 import {
   getLeaveTypes,
@@ -33,8 +35,9 @@ export default function Page() {
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<LeaveType | null>(null);
-
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const [drawerOpen, setDrawerOpen] = useState(false); // <-- NEW
 
   const loadLeaveTypes = async () => {
     try {
@@ -74,7 +77,7 @@ export default function Page() {
       await loadLeaveTypes();
     } catch (err) {
       console.error("Error submitting leave type", err);
-      alert("Failed to save. See console for details.");
+      alert("Error occurred — see console.");
     }
   };
 
@@ -86,15 +89,31 @@ export default function Page() {
       await loadLeaveTypes();
     } catch (err) {
       console.error("Error deleting leave type", err);
-      alert("Failed to delete. See console.");
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-10 text-white">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
+    <div className="min-h-screen relative bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-10 text-white">
+
+      {/* HAMBURGER ICON (TOP-LEFT) */}
+      <button
+        className="absolute top-6 left-6 text-white text-3xl hover:text-cyan-400 transition"
+        onClick={() => setDrawerOpen(true)}
+      >
+        <FiMenu />
+      </button>
+
+      {/* CATEGORY DRAWER */}
+      <CategoryDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        categories={categories}
+      />
+
+      <div className="max-w-6xl mx-auto mt-10">
+        <div className="flex justify-between items-center mb-8">
           <h1 className="text-4xl font-semibold">Leave Types</h1>
+
           <button
             className="px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-xl shadow-lg"
             onClick={() => {
