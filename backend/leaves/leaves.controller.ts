@@ -30,6 +30,7 @@ import { ApproveAdjustmentDto } from './dto/approve-adjustment.dto';
 import { CreateCalendarDto } from './dto/create-calendar.dto';
 import { UpdateCalendarDto } from './dto/update-calendar.dto';
 import { CreateBlockedPeriodDto } from './dto/create-blocked-period.dto';
+import { CreateLeaveCategoryDto } from './dto/create-leave-category.dto';
 
 @Controller()
 export class LeavesController {
@@ -96,6 +97,30 @@ export class LeavesController {
   removePolicy(@Param('id') id: string) {
     return this.service.leavePolicy.remove(id);
   }
+
+  // ===================================================
+// LEAVE CATEGORY
+// ===================================================
+@Post('leave-category')
+createCategory(@Body() dto: CreateLeaveCategoryDto) {
+  return this.service.leaveCategory.create(dto);
+}
+
+@Get('leave-category')
+findAllCategories() {
+  return this.service.leaveCategory.findAll();
+}
+
+@Patch('leave-category/:id')
+updateCategory(@Param('id') id: string, @Body() dto: CreateLeaveCategoryDto) {
+  return this.service.leaveCategory.update(id, dto);
+}
+
+@Delete('leave-category/:id')
+removeCategory(@Param('id') id: string) {
+  return this.service.leaveCategory.remove(id);
+}
+
 
   // ===================================================
   // LEAVE REQUEST
