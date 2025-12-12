@@ -21,28 +21,28 @@ export default function LeavesHome() {
     },
     {
       title: "Leave Policies",
-      desc: "Configure organization rules for accruals, carryovers, max limits, and eligibility.",
+      desc: "Configure rules for accruals, carryovers, limits, and eligibility.",
       icon: <Settings className="w-8 h-8" />,
-      link: "/subsystems/leaves/leave-policies",
+      link: "/subsystems/leaves/policies",
       gradient: "from-cyan-500 to-teal-500",
     },
     {
       title: "Leave Requests",
-      desc: "Submit, review, approve, or reject employee leave requests.",
+      desc: "Submit requests, track status, and manage approval workflow.",
       icon: <ClipboardList className="w-8 h-8" />,
-      link: "/subsystems/leaves/leave-requests",
+      link: "/subsystems/leaves/requests",
       gradient: "from-purple-500 to-pink-500",
     },
     {
       title: "Leave Entitlements",
-      desc: "Assign annual leave balances, adjustments, and employee-specific entitlements.",
+      desc: "Manage employee annual entitlements, balances, and adjustments.",
       icon: <Users className="w-8 h-8" />,
-      link: "/subsystems/leaves/leave-entitlements",
+      link: "/subsystems/leaves/entitlements",
       gradient: "from-indigo-500 to-purple-600",
     },
     {
       title: "Leave Calendar",
-      desc: "Manage official holidays, blocked dates, and view organization-wide schedules.",
+      desc: "Manage official holidays, blocked days, and organization schedules.",
       icon: <Calendar className="w-8 h-8" />,
       link: "/subsystems/leaves/calendar",
       gradient: "from-teal-500 to-emerald-500",
@@ -95,13 +95,10 @@ export default function LeavesHome() {
                   </div>
                 </div>
 
-                {/* Title */}
                 <h3 className="text-2xl mb-3">{f.title}</h3>
 
-                {/* Description */}
                 <p className="text-gray-400 mb-4 leading-relaxed">{f.desc}</p>
 
-                {/* Learn More */}
                 <div className="flex items-center gap-2 text-cyan-400 opacity-0 group-hover:opacity-100 transition-all">
                   Open
                   <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
