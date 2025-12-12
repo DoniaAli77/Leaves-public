@@ -8,6 +8,10 @@
     "start": "next start"
   },
   "dependencies": {
+    "@nestjs/common": "^10.4.20",
+    "@nestjs/core": "^10.4.20",
+    "@nestjs/platform-express": "^10.4.20",
+    "@nestjs/testing": "^10.4.20",
     "axios": "^1.13.2",
     "lucide-react": "^0.559.0",
     "next": "16.0.2",
@@ -19,6 +23,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.4.22",
+    "baseline-browser-mapping": "^2.9.6",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.19",
     "typescript": "^5"
