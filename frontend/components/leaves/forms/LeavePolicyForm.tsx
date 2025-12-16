@@ -19,12 +19,13 @@ export default function LeavePolicyForm({
 }: Props) {
   const [form, setForm] = useState({
     leaveTypeId: "",
-    accrualMethod: "monthly",
+    policyType: "",
+    accrualMethod: "MONTHLY",
     monthlyRate: "",
     yearlyRate: "",
     carryForwardAllowed: false,
     maxCarryForward: "",
-    roundingRule: "none",
+    roundingRule: "NONE",
     minNoticeDays: "",
     maxConsecutiveDays: "",
   });
@@ -34,13 +35,14 @@ export default function LeavePolicyForm({
     if (!initialData) return;
 
     setForm({
-      leaveTypeId: initialData.leaveTypeId ?? "",
-      accrualMethod: initialData.accrualMethod ?? "monthly",
+      leaveTypeId: initialData.leaveTypeId?.toString() ?? "",
+      policyType: initialData.policyType ?? "",
+      accrualMethod: initialData.accrualMethod ?? "MONTHLY",
       monthlyRate: initialData.monthlyRate?.toString() ?? "",
       yearlyRate: initialData.yearlyRate?.toString() ?? "",
       carryForwardAllowed: initialData.carryForwardAllowed ?? false,
       maxCarryForward: initialData.maxCarryForward?.toString() ?? "",
-      roundingRule: initialData.roundingRule ?? "none",
+      roundingRule: initialData.roundingRule ?? "NONE",
       minNoticeDays: initialData.minNoticeDays?.toString() ?? "",
       maxConsecutiveDays: initialData.maxConsecutiveDays?.toString() ?? "",
     });
@@ -52,9 +54,11 @@ export default function LeavePolicyForm({
   const handleChange = (key: string, value: any) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (loading) return;
     const payload = {
       leaveTypeId: form.leaveTypeId,
+      policyType: form.policyType,
       accrualMethod: form.accrualMethod,
       monthlyRate: Number(form.monthlyRate) || 0,
       yearlyRate: Number(form.yearlyRate) || 0,
@@ -65,7 +69,7 @@ export default function LeavePolicyForm({
       maxConsecutiveDays: Number(form.maxConsecutiveDays) || 0,
     };
 
-    onSubmit(payload);
+    await onSubmit(payload);
   };
 
   return (
@@ -98,6 +102,16 @@ export default function LeavePolicyForm({
             />
           </div>
 
+          {/* Policy Type */}
+          <div>
+            <label className="text-sm text-gray-300">Policy Type</label>
+            <input
+              className={input}
+              value={form.policyType}
+              onChange={(e) => handleChange("policyType", e.target.value)}
+            />
+          </div>
+
           {/* Accrual Method */}
           <div>
             <label className="text-sm text-gray-300">Accrual Method</label>
@@ -106,9 +120,9 @@ export default function LeavePolicyForm({
               value={form.accrualMethod}
               onChange={(e) => handleChange("accrualMethod", e.target.value)}
             >
-              <option value="monthly">Monthly</option>
-              <option value="yearly">Yearly</option>
-              <option value="per-term">Per Term</option>
+              <option value="MONTHLY">Monthly</option>
+              <option value="ANNUAL">Annual</option>
+              <option value="NONE">None</option>
             </select>
           </div>
 
@@ -161,15 +175,15 @@ export default function LeavePolicyForm({
           <div>
             <label className="text-sm text-gray-300">Rounding Rule</label>
             <select
-              className={input}
-              value={form.roundingRule}
-              onChange={(e) => handleChange("roundingRule", e.target.value)}
-            >
-              <option value="none">None</option>
-              <option value="round_up">Round Up</option>
-              <option value="round_down">Round Down</option>
-              <option value="round">Round</option>
-            </select>
+            className={input}
+            value={form.roundingRule}
+            onChange={(e) => handleChange("roundingRule", e.target.value)}
+          >
+            <option value="NONE">None</option>
+            <option value="ROUND_UP">Round Up</option>
+            <option value="ROUND_DOWN">Round Down</option>
+            <option value="ROUND">Round</option>
+          </select>
           </div>
 
           {/* Min Notice Days */}

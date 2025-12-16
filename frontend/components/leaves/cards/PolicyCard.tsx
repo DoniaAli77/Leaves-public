@@ -20,19 +20,6 @@ export default function PolicyCard({
   onEdit,
   onDelete,
 }: PolicyCardProps) {
-  
-  const start = effectiveFrom
-    ? new Date(effectiveFrom).toLocaleDateString()
-    : "—";
-
-  const end = effectiveTo
-    ? new Date(effectiveTo).toLocaleDateString()
-    : "No end date";
-
-  // Correct active badge
-  const activeColor = isActive
-    ? "bg-green-600/20 text-green-400"
-    : "bg-red-600/20 text-red-400";
 
   return (
     <div className="bg-white/5 border border-white/10 rounded-2xl p-6 shadow backdrop-blur">
