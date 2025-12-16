@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import type { JSX } from 'react';
 import Link from 'next/link';
 import {
   Users,
@@ -68,9 +69,12 @@ const modules = [
   },
 ];
 
-export default function Home() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
+export default function Home(): JSX.Element {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+  const [scrolled, setScrolled] = useState<boolean>(false);
+
+  // ✅ added
+  const [showLoginSuccess, setShowLoginSuccess] = useState<boolean>(false);
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 20);
@@ -78,13 +82,36 @@ export default function Home() {
     return () => window.removeEventListener("scroll", handler);
   }, []);
 
-  const scrollTo = (id: string) => {
+  // ✅ added
+  useEffect(() => {
+    const success = localStorage.getItem("loginSuccess");
+    if (success === "true") {
+      setShowLoginSuccess(true);
+      localStorage.removeItem("loginSuccess");
+
+      const timer = setTimeout(() => {
+        setShowLoginSuccess(false);
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  const scrollTo = (id: string): void => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
     setMobileMenuOpen(false);
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-white overflow-hidden">
+
+      {showLoginSuccess && (
+        <div className="fixed top-24 right-6 z-[9999]">
+          <div className="bg-green-600 text-white px-6 py-4 rounded-xl shadow-xl animate-slide-in">
+            ✅ Login successful
+          </div>
+        </div>
+      )}
 
       {/* NAVBAR */}
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
@@ -120,15 +147,17 @@ export default function Home() {
               ))}
             </div>
 
-            {/* LOGIN BUTTON */}
+            {/* LOGIN BUTTON (ROUTED) */}
             <div className="hidden lg:block">
-              <button className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl blur-sm group-hover:blur-md transition-all" />
-                <div className="relative px-6 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl flex items-center gap-2">
-                  Login
-                  <ChevronRight className="w-4 h-4" />
-                </div>
-              </button>
+              <Link href="/login">
+                <button className="relative group">
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl blur-sm group-hover:blur-md transition-all" />
+                  <div className="relative px-6 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl flex items-center gap-2">
+                    Login
+                    <ChevronRight className="w-4 h-4" />
+                  </div>
+                </button>
+              </Link>
             </div>
 
             {/* MOBILE MENU BUTTON */}
@@ -153,13 +182,15 @@ export default function Home() {
                 {item[0].toUpperCase() + item.slice(1)}
               </button>
             ))}
-            <button className="w-full px-6 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl">
-              Login
-            </button>
+
+            <Link href="/login">
+              <button className="w-full px-6 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl">
+                Login
+              </button>
+            </Link>
           </div>
         )}
       </nav>
-
       {/* HERO SECTION */}
       <header id="home" className="pt-32 pb-20 lg:pt-40 lg:pb-32 px-6">
         <div className="max-w-7xl mx-auto text-center relative z-10">
@@ -236,13 +267,18 @@ export default function Home() {
             {modules.map((m) => (
               <Link key={m.name} href={m.route}>
                 <div className="group relative cursor-pointer">
-                  <div className={`absolute inset-0 bg-gradient-to-br ${m.gradient} blur-xl rounded-3xl opacity-0 group-hover:opacity-30 transition-all`} />
+                  <div
+                    className={`absolute inset-0 bg-gradient-to-br ${m.gradient} blur-xl rounded-3xl opacity-0 group-hover:opacity-30 transition-all`}
+                  />
 
-                  <div className="relative bg-white/5 border border-white/10 backdrop-blur-xl p-6 
-                                  rounded-3xl hover:border-white/20 transition-all hover:-translate-y-2">
-
+                  <div
+                    className="relative bg-white/5 border border-white/10 backdrop-blur-xl p-6
+                               rounded-3xl hover:border-white/20 transition-all hover:-translate-y-2"
+                  >
                     <div className="relative mb-4">
-                      <div className={`absolute inset-0 bg-gradient-to-br ${m.gradient} rounded-2xl blur-md opacity-50`} />
+                      <div
+                        className={`absolute inset-0 bg-gradient-to-br ${m.gradient} rounded-2xl blur-md opacity-50`}
+                      />
                       <div className={`relative bg-gradient-to-br ${m.gradient} p-3 rounded-2xl`}>
                         {m.icon}
                       </div>
@@ -255,7 +291,6 @@ export default function Home() {
                       Open Module
                       <ChevronRight className="w-4 h-4" />
                     </div>
-
                   </div>
                 </div>
               </Link>
@@ -264,7 +299,6 @@ export default function Home() {
 
         </div>
       </section>
-
       {/* ABOUT SECTION */}
       <section id="about" className="py-20 px-6">
         <div className="max-w-7xl mx-auto">
@@ -277,37 +311,39 @@ export default function Home() {
           </div>
 
           <div className="grid lg:grid-cols-3 gap-8">
-            {[  
+            {[
               {
                 title: 'Unified Experience',
                 desc: 'All subsystems share a single source of truth for maximum consistency and accuracy.',
                 icon: <Network className="w-6 h-6" />,
-                gradient: 'from-blue-500 to-cyan-500'
+                gradient: 'from-blue-500 to-cyan-500',
               },
               {
                 title: 'Modern Interface',
                 desc: 'Intuitive UI ensures fast learning and seamless navigation across roles.',
                 icon: <Sparkles className="w-6 h-6" />,
-                gradient: 'from-cyan-500 to-teal-500'
+                gradient: 'from-cyan-500 to-teal-500',
               },
               {
                 title: 'Modular Architecture',
                 desc: 'Subsystems are independently developed yet fully integrated.',
                 icon: <Target className="w-6 h-6" />,
-                gradient: 'from-indigo-500 to-purple-500'
-              }
+                gradient: 'from-indigo-500 to-purple-500',
+              },
             ].map((f, i) => (
               <div key={i} className="group relative">
-                <div className={`absolute inset-0 bg-gradient-to-br ${f.gradient} blur-xl rounded-3xl opacity-0 group-hover:opacity-20 transition-all`} />
+                <div
+                  className={`absolute inset-0 bg-gradient-to-br ${f.gradient} blur-xl rounded-3xl opacity-0 group-hover:opacity-20 transition-all`}
+                />
                 <div className="relative bg-white/5 border border-white/10 rounded-3xl p-8 backdrop-blur-xl hover:border-white/20 transition-all">
-
-                  <div className={`p-3 mb-6 rounded-2xl text-white bg-gradient-to-br ${f.gradient}`}>
+                  <div
+                    className={`p-3 mb-6 rounded-2xl text-white bg-gradient-to-br ${f.gradient}`}
+                  >
                     {f.icon}
                   </div>
 
                   <h4 className="text-2xl mb-4 text-white">{f.title}</h4>
                   <p className="text-gray-400 leading-relaxed">{f.desc}</p>
-
                 </div>
               </div>
             ))}
