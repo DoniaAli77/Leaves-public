@@ -1,21 +1,30 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { cors: true });
+  const app = await NestFactory.create(AppModule);
 
+  // ✅ ENABLE CORS FOR FRONTEND
   app.enableCors({
-    origin: "http://localhost:3001", // Your Next.js frontend
-    methods: "GET,POST,PATCH,PUT,DELETE",
-    allowedHeaders: "Content-Type,Authorization",
+    origin: 'http://localhost:3001', // Next.js frontend
+    credentials: true,
   });
 
-  const port = process.env.PORT || 3000;
-  await app.listen(port);
+  // ✅ SWAGGER SETUP
+  const config = new DocumentBuilder()
+    .setTitle('Employee Profile API')
+    .setDescription('API documentation')
+    .setVersion('1.0')
+    .build();
 
-  console.log('');
-  console.log(`🚀 Server is running at: http://localhost:${port}`);
-  console.log('CORS enabled for http://localhost:3001');
-  console.log('');
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, document);
+
+  // ✅ START SERVER
+  await app.listen(process.env.PORT || 3000);
+
+  console.log(`🚀 Backend running on http://localhost:${process.env.PORT || 3000}`);
 }
+
 bootstrap();
