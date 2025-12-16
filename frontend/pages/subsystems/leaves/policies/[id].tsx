@@ -72,17 +72,13 @@ export default function EditPolicyPage() {
         <h1 className="text-4xl font-light mb-8">Edit Leave Policy</h1>
 
         <LeavePolicyForm
+          mode="edit"
           initialData={policy}
           onSubmit={handleUpdate}
+          onDelete={handleDelete}
           loading={saving}
+          onClose={async () => { await router.push("/subsystems/leaves/policies"); }}
         />
-
-        <button
-          onClick={handleDelete}
-          className="mt-6 px-4 py-2 bg-red-600 rounded-lg hover:bg-red-700 transition"
-        >
-          Delete Policy
-        </button>
       </div>
     </div>
   );
