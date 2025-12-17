@@ -37,6 +37,9 @@ export class AuthService {
       username: employee.firstName + " " + employee.lastName,
     };
 
+    console.log("LOGIN PAYLOAD:", payload);
+
+
     // ✅ Step 4: generate token
     const token = await this.jwtService.signAsync(payload);
 
