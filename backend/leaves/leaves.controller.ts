@@ -32,6 +32,14 @@ import { UpdateCalendarDto } from './dto/update-calendar.dto';
 import { CreateBlockedPeriodDto } from './dto/create-blocked-period.dto';
 import { CreateLeaveCategoryDto } from './dto/create-leave-category.dto';
 
+import { UseGuards } from '@nestjs/common';
+
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { ADMIN_ROLES } from '../common/constants/role-groups';
+
+
 @Controller()
 export class LeavesController {
   constructor(private readonly service: LeavesService) {}
@@ -74,6 +82,8 @@ export class LeavesController {
   // LEAVE POLICY
   // ===================================================
   @Post('leave-policy')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...ADMIN_ROLES)
   createPolicy(@Body() dto: CreatePolicyDto) {
     return this.service.leavePolicy.create(dto);
   }
@@ -89,14 +99,20 @@ export class LeavesController {
   }
 
   @Patch('leave-policy/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...ADMIN_ROLES)
   updatePolicy(@Param('id') id: string, @Body() dto: UpdatePolicyDto) {
     return this.service.leavePolicy.update(id, dto);
   }
 
+
   @Delete('leave-policy/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...ADMIN_ROLES)
   removePolicy(@Param('id') id: string) {
     return this.service.leavePolicy.remove(id);
   }
+
 
   // ===================================================
 // LEAVE CATEGORY

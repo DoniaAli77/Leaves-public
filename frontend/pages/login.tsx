@@ -17,6 +17,8 @@ const LoginPage: React.FC = () => {
       });
 
       const data = res.data;
+      console.log("LOGIN RESPONSE:", data);
+
 
       localStorage.setItem("token", data.access_token);
       localStorage.setItem("role", String(data.payload.role));

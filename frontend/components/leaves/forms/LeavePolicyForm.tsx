@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { isAdmin } from "@/utils/roles";
 
 interface Props {
   initialData?: any;
@@ -17,34 +19,49 @@ export default function LeavePolicyForm({
   loading = false,
   onClose,
 }: Props) {
+  const { user } = useAuth();
+
+  // 🔒 Admin-only (UX guard)
+  if (!isAdmin(user?.roles)) {
+    return (
+      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+        <div className="bg-slate-900 border border-white/10 p-6 rounded-xl text-red-400">
+          Unauthorized – Admin access required
+        </div>
+      </div>
+    );
+  }
+
   const [form, setForm] = useState({
+    policyType: "STANDARD",
     leaveTypeId: "",
-    policyType: "",
-    accrualMethod: "MONTHLY",
-    monthlyRate: "",
-    yearlyRate: "",
+    isActive: true,
+    minServiceMonths: "",
+    maxServiceMonths: "",
+    effectiveFrom: "",
+    effectiveTo: "",
+    maxDaysPerRequest: "",
+    maxRequestsPerYear: "",
     carryForwardAllowed: false,
-    maxCarryForward: "",
-    roundingRule: "NONE",
-    minNoticeDays: "",
-    maxConsecutiveDays: "",
+    carryForwardLimit: "",
   });
 
-  // Load initial values on edit
+  // 🟡 Load data on EDIT
   useEffect(() => {
     if (!initialData) return;
 
     setForm({
-      leaveTypeId: initialData.leaveTypeId?.toString() ?? "",
-      policyType: initialData.policyType ?? "",
-      accrualMethod: initialData.accrualMethod ?? "MONTHLY",
-      monthlyRate: initialData.monthlyRate?.toString() ?? "",
-      yearlyRate: initialData.yearlyRate?.toString() ?? "",
+      policyType: initialData.policyType ?? "STANDARD",
+      leaveTypeId: initialData.leaveTypeId ?? "",
+      isActive: initialData.isActive ?? true,
+      minServiceMonths: initialData.minServiceMonths?.toString() ?? "",
+      maxServiceMonths: initialData.maxServiceMonths?.toString() ?? "",
+      effectiveFrom: initialData.effectiveFrom?.split("T")[0] ?? "",
+      effectiveTo: initialData.effectiveTo?.split("T")[0] ?? "",
+      maxDaysPerRequest: initialData.maxDaysPerRequest?.toString() ?? "",
+      maxRequestsPerYear: initialData.maxRequestsPerYear?.toString() ?? "",
       carryForwardAllowed: initialData.carryForwardAllowed ?? false,
-      maxCarryForward: initialData.maxCarryForward?.toString() ?? "",
-      roundingRule: initialData.roundingRule ?? "NONE",
-      minNoticeDays: initialData.minNoticeDays?.toString() ?? "",
-      maxConsecutiveDays: initialData.maxConsecutiveDays?.toString() ?? "",
+      carryForwardLimit: initialData.carryForwardLimit?.toString() ?? "",
     });
   }, [initialData]);
 
@@ -54,19 +71,22 @@ export default function LeavePolicyForm({
   const handleChange = (key: string, value: any) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
+  // ✅ EXACT backend payload
   const handleSubmit = async () => {
     if (loading) return;
+
     const payload = {
-      leaveTypeId: form.leaveTypeId,
       policyType: form.policyType,
-      accrualMethod: form.accrualMethod,
-      monthlyRate: Number(form.monthlyRate) || 0,
-      yearlyRate: Number(form.yearlyRate) || 0,
+      leaveTypeId: form.leaveTypeId,
+      isActive: form.isActive,
+      minServiceMonths: Number(form.minServiceMonths),
+      maxServiceMonths: Number(form.maxServiceMonths),
+      effectiveFrom: form.effectiveFrom || null,
+      effectiveTo: form.effectiveTo || null,
+      maxDaysPerRequest: Number(form.maxDaysPerRequest),
+      maxRequestsPerYear: Number(form.maxRequestsPerYear),
       carryForwardAllowed: form.carryForwardAllowed,
-      maxCarryForward: Number(form.maxCarryForward) || 0,
-      roundingRule: form.roundingRule,
-      minNoticeDays: Number(form.minNoticeDays) || 0,
-      maxConsecutiveDays: Number(form.maxConsecutiveDays) || 0,
+      carryForwardLimit: Number(form.carryForwardLimit),
     };
 
     await onSubmit(payload);
@@ -81,7 +101,6 @@ export default function LeavePolicyForm({
           <h3 className="text-xl text-white font-semibold">
             {mode === "edit" ? "Edit Leave Policy" : "Create Leave Policy"}
           </h3>
-
           {onClose && (
             <button className="text-gray-300" onClick={onClose}>
               Close
@@ -89,10 +108,21 @@ export default function LeavePolicyForm({
           )}
         </div>
 
-        {/* FORM GRID */}
+        {/* FORM */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
 
-          {/* Leave Type ID */}
+          <div>
+            <label className="text-sm text-gray-300">Policy Type</label>
+            <select
+              className={input}
+              value={form.policyType}
+              onChange={(e) => handleChange("policyType", e.target.value)}
+            >
+              <option value="STANDARD">STANDARD</option>
+              <option value="SPECIAL">SPECIAL</option>
+            </select>
+          </div>
+
           <div>
             <label className="text-sm text-gray-300">Leave Type ID</label>
             <input
@@ -102,54 +132,92 @@ export default function LeavePolicyForm({
             />
           </div>
 
-          {/* Policy Type */}
-          <div>
-            <label className="text-sm text-gray-300">Policy Type</label>
+          <label className="flex items-center gap-3 mt-2 text-gray-300">
             <input
-              className={input}
-              value={form.policyType}
-              onChange={(e) => handleChange("policyType", e.target.value)}
+              type="checkbox"
+              checked={form.isActive}
+              onChange={(e) => handleChange("isActive", e.target.checked)}
             />
-          </div>
+            Active
+          </label>
 
-          {/* Accrual Method */}
           <div>
-            <label className="text-sm text-gray-300">Accrual Method</label>
-            <select
-              className={input}
-              value={form.accrualMethod}
-              onChange={(e) => handleChange("accrualMethod", e.target.value)}
-            >
-              <option value="MONTHLY">Monthly</option>
-              <option value="ANNUAL">Annual</option>
-              <option value="NONE">None</option>
-            </select>
-          </div>
-
-          {/* Monthly Rate */}
-          <div>
-            <label className="text-sm text-gray-300">Monthly Rate</label>
+            <label className="text-sm text-gray-300">Min Service Months</label>
             <input
               type="number"
               className={input}
-              value={form.monthlyRate}
-              onChange={(e) => handleChange("monthlyRate", e.target.value)}
+              value={form.minServiceMonths}
+              onChange={(e) =>
+                handleChange("minServiceMonths", e.target.value)
+              }
             />
           </div>
 
-          {/* Yearly Rate */}
           <div>
-            <label className="text-sm text-gray-300">Yearly Rate</label>
+            <label className="text-sm text-gray-300">Max Service Months</label>
             <input
               type="number"
               className={input}
-              value={form.yearlyRate}
-              onChange={(e) => handleChange("yearlyRate", e.target.value)}
+              value={form.maxServiceMonths}
+              onChange={(e) =>
+                handleChange("maxServiceMonths", e.target.value)
+              }
             />
           </div>
 
-          {/* Carry Forward Allowed */}
-          <div className="flex items-center gap-3 mt-2">
+          <div>
+            <label className="text-sm text-gray-300">Effective From</label>
+            <input
+              type="date"
+              className={input}
+              value={form.effectiveFrom}
+              onChange={(e) =>
+                handleChange("effectiveFrom", e.target.value)
+              }
+            />
+          </div>
+
+          <div>
+            <label className="text-sm text-gray-300">Effective To</label>
+            <input
+              type="date"
+              className={input}
+              value={form.effectiveTo}
+              onChange={(e) =>
+                handleChange("effectiveTo", e.target.value)
+              }
+            />
+          </div>
+
+          <div>
+            <label className="text-sm text-gray-300">
+              Max Days Per Request
+            </label>
+            <input
+              type="number"
+              className={input}
+              value={form.maxDaysPerRequest}
+              onChange={(e) =>
+                handleChange("maxDaysPerRequest", e.target.value)
+              }
+            />
+          </div>
+
+          <div>
+            <label className="text-sm text-gray-300">
+              Max Requests Per Year
+            </label>
+            <input
+              type="number"
+              className={input}
+              value={form.maxRequestsPerYear}
+              onChange={(e) =>
+                handleChange("maxRequestsPerYear", e.target.value)
+              }
+            />
+          </div>
+
+          <label className="flex items-center gap-3 mt-2 text-gray-300">
             <input
               type="checkbox"
               checked={form.carryForwardAllowed}
@@ -157,62 +225,25 @@ export default function LeavePolicyForm({
                 handleChange("carryForwardAllowed", e.target.checked)
               }
             />
-            <label className="text-gray-300">Allow Carry Forward</label>
-          </div>
+            Allow Carry Forward
+          </label>
 
-          {/* Max Carry Forward */}
           <div>
-            <label className="text-sm text-gray-300">Max Carry Forward</label>
+            <label className="text-sm text-gray-300">
+              Carry Forward Limit
+            </label>
             <input
               type="number"
               className={input}
-              value={form.maxCarryForward}
-              onChange={(e) => handleChange("maxCarryForward", e.target.value)}
-            />
-          </div>
-
-          {/* Rounding Rule */}
-          <div>
-            <label className="text-sm text-gray-300">Rounding Rule</label>
-            <select
-            className={input}
-            value={form.roundingRule}
-            onChange={(e) => handleChange("roundingRule", e.target.value)}
-          >
-            <option value="NONE">None</option>
-            <option value="ROUND_UP">Round Up</option>
-            <option value="ROUND_DOWN">Round Down</option>
-            <option value="ROUND">Round</option>
-          </select>
-          </div>
-
-          {/* Min Notice Days */}
-          <div>
-            <label className="text-sm text-gray-300">Min Notice Days</label>
-            <input
-              type="number"
-              className={input}
-              value={form.minNoticeDays}
-              onChange={(e) => handleChange("minNoticeDays", e.target.value)}
-            />
-          </div>
-
-          {/* Max Consecutive Days */}
-          <div>
-            <label className="text-sm text-gray-300">Max Consecutive Days</label>
-            <input
-              type="number"
-              className={input}
-              value={form.maxConsecutiveDays}
+              value={form.carryForwardLimit}
               onChange={(e) =>
-                handleChange("maxConsecutiveDays", e.target.value)
+                handleChange("carryForwardLimit", e.target.value)
               }
             />
           </div>
-
         </div>
 
-        {/* ACTION BUTTONS */}
+        {/* ACTIONS */}
         <div className="mt-8 flex justify-end gap-4">
           {mode === "edit" && onDelete && (
             <button
@@ -237,7 +268,11 @@ export default function LeavePolicyForm({
             disabled={loading}
             className="px-6 py-2 bg-gradient-to-r from-blue-600 to-cyan-500 text-white rounded-md disabled:opacity-50"
           >
-            {loading ? "Saving..." : mode === "edit" ? "Update Policy" : "Create Policy"}
+            {loading
+              ? "Saving..."
+              : mode === "edit"
+              ? "Update Policy"
+              : "Create Policy"}
           </button>
         </div>
       </div>
