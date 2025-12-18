@@ -6,7 +6,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { EmployeeStatus, SystemRole } from '../enums/employee-profile.enums';
 import { RegisterDto } from '../dto/register.dto';
-
+import { ADMIN_ROLES } from '../../common/constants/role-groups';
 @Injectable()
 export class AuthService {
     employeeSystemRoleModel: any;
@@ -16,68 +16,69 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async login(dto: { employeeNumber: string; password: string }) {
-    // ✅ Step 1: find employee by employeeNumber
-    const employee = await this.employeeModel.findOne({ employeeNumber: dto.employeeNumber });
-    if (!employee) {
-      throw new NotFoundException('Employee not found ❌');
-    }
+ async login(dto: { employeeNumber: string; password: string }) {
+  const employee = await this.employeeModel.findOne({
+    employeeNumber: dto.employeeNumber,
+  });
+  if (!employee) throw new NotFoundException("Employee not found");
 
-    // ✅ Step 2: compare password with hashed password in D
-    const isMatch = await bcrypt.compare(dto.password, employee.password as string);
+  const isMatch = await bcrypt.compare(dto.password, employee.password as string);
+  if (!isMatch) throw new UnauthorizedException("Invalid credentials");
 
-    if (!isMatch) {
-      throw new UnauthorizedException('Invalid credentials ❌ (Wrong password)');
-    }
+  let role: SystemRole;
+  const n = dto.employeeNumber.toUpperCase();
 
-    // ✅ Step 3: build JWT payload based on your project
-    const payload = {
-      id: employee._id,
-      role: (employee as any).systemRole,
-      username: employee.firstName + " " + employee.lastName,
-    };
+  if (n.startsWith("HRADM")) role = SystemRole.HR_ADMIN;
+  else if (n.startsWith("HRM") || n.startsWith("HRMAN")) role = SystemRole.HR_MANAGER;
+  else if (n.startsWith("HRE")) role = SystemRole.HR_EMPLOYEE;
+  else if (n.startsWith("DH")) role = SystemRole.DEPARTMENT_HEAD;
+  else if (n.startsWith("DEPT")) role = SystemRole.DEPARTMENT_EMPLOYEE;
+  else if (n.startsWith("PAYM")) role = SystemRole.PAYROLL_MANAGER;
+  else if (n.startsWith("PAYS")) role = SystemRole.PAYROLL_SPECIALIST;
+  else if (n.startsWith("SYS")) role = SystemRole.SYSTEM_ADMIN;
+  else if (n.startsWith("REC")) role = SystemRole.RECRUITER;
+  else if (n.startsWith("FIN")) role = SystemRole.FINANCE_STAFF;
+  else role = SystemRole.DEPARTMENT_EMPLOYEE;
 
-    console.log("LOGIN PAYLOAD:", payload);
+  const payload = {
+    id: employee._id.toString(),
+    username: employee.firstName + " " + employee.lastName,
+    role,
+  };
 
+  const token = await this.jwtService.signAsync(payload);
 
-    // ✅ Step 4: generate token
-    const token = await this.jwtService.signAsync(payload);
+  return {
+    access_token: token,
+    payload,
+    isAdmin: ADMIN_ROLES.includes(role), // ✅ IMPORTANT
+  };
+}
 
-    // ✅ Step 5: return it in the same logic structure
-    return {
-      access_token: token,
-      payload,
-    };
-  }
   
-async register(dto: {
-  employeeNumber: string;
-  password: string;
-  role: SystemRole;
-  firstName: string;
-  lastName: string;
-  nationalId: string;
-  dateOfHire: string;
-}) {
+async register(dto: RegisterDto) {
 
-  const exists = await this.employeeModel.findOne({ employeeNumber: dto.employeeNumber });
-  if (exists) {
+  const exists = await this.employeeModel.findOne({
+    employeeNumber: dto.employeeNumber,
+  });
+  if (exists)
     throw new BadRequestException("Employee number already exists ❌");
-  }
 
   const hashedPassword = await bcrypt.hash(dto.password, 10);
 
   const newEmployee = new this.employeeModel({
     employeeNumber: dto.employeeNumber,
     password: hashedPassword,
-    status: EmployeeStatus.ACTIVE, // ✅ governance rule preserved
-     // ✅ SAVE ROLE INTO EXISTING ARRAY, NO SCHEMA CHANGE
-    nationalId: dto.nationalId,
     firstName: dto.firstName,
     lastName: dto.lastName,
+    nationalId: dto.nationalId,
     dateOfHire: new Date(dto.dateOfHire),
+    address: dto.address,
+    systemRole: dto.role,        // ✅ correct
+    status: EmployeeStatus.ACTIVE,
   });
 
-  return newEmployee.save(); // ✅ No .create() on undefined
+  return newEmployee.save();
 }
+
 }
