@@ -1,5 +1,7 @@
 // components/leaves/forms/LeaveRequestForm.tsx
 import React, { useEffect, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { isEmployee } from "@/utils/roles";
 
 interface LeaveType {
   _id: string;
@@ -13,6 +15,16 @@ interface Props {
 }
 
 export default function LeaveRequestForm({ leaveTypes, onSubmit, errorMessage }: Props) {
+    const { user } = useAuth();
+
+  // 🔒 EMPLOYEE ONLY
+  if (!isEmployee(user?.roles)) {
+    return (
+      <div className="bg-slate-900 p-6 rounded-xl text-red-400 border border-white/10">
+        Only employees can create leave requests
+      </div>
+    );
+  }
   const [leaveTypeId, setLeaveTypeId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
