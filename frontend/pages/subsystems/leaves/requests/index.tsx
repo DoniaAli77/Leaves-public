@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { getLeaveRequests } from "@/services/leaves/leaveRequests.api";
 import Link from "next/link";
+import { useAuth } from "@/hooks/useAuth";
+import { isEmployee } from "@/utils/roles";
+
 
 interface LeaveRequest {
   _id: string;
@@ -12,6 +15,8 @@ interface LeaveRequest {
 }
 
 export default function LeaveRequestsPage() {
+  const { user } = useAuth();
+  const canCreate = isEmployee(user?.roles);
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -35,12 +40,14 @@ export default function LeaveRequestsPage() {
       <div className="max-w-5xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-4xl font-semibold">Leave Requests</h1>
-          <Link
-            href="/subsystems/leaves/requests/create"
-            className="px-5 py-3 bg-blue-600 rounded-lg"
-          >
-            + New Request
-          </Link>
+          {canCreate && (
+            <Link
+              href="/subsystems/leaves/requests/create"
+              className="px-5 py-3 bg-blue-600 rounded-lg"
+            >
+              + New Request
+            </Link>
+          )}
         </div>
 
         {loading ? (
