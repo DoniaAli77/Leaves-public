@@ -20,8 +20,9 @@ interface PolicyCardProps {
   carryForwardAllowed?: boolean;
   carryForwardLimit?: number;
 
-  onEdit: () => void;
-  onDelete: () => void;
+  // ✅ OPTIONAL — role-based UI
+  onEdit?: () => void;
+  onDelete?: () => void;
 }
 
 export default function PolicyCard({
@@ -111,23 +112,27 @@ export default function PolicyCard({
       </div>
 
       {/* ACTIONS — ADMIN ONLY */}
-      {canManage && (
+      {canManage && (onEdit || onDelete) && (
         <div className="flex gap-4 mt-5">
-          <button
-            onClick={onEdit}
-            className="text-cyan-400 hover:text-cyan-200 transition"
-            title="Edit policy"
-          >
-            <Edit3 className="w-5 h-5" />
-          </button>
+          {onEdit && (
+            <button
+              onClick={onEdit}
+              className="text-cyan-400 hover:text-cyan-200 transition"
+              title="Edit policy"
+            >
+              <Edit3 className="w-5 h-5" />
+            </button>
+          )}
 
-          <button
-            onClick={onDelete}
-            className="text-red-400 hover:text-red-300 transition"
-            title="Delete policy"
-          >
-            <Trash2 className="w-5 h-5" />
-          </button>
+          {onDelete && (
+            <button
+              onClick={onDelete}
+              className="text-red-400 hover:text-red-300 transition"
+              title="Delete policy"
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
+          )}
         </div>
       )}
     </div>

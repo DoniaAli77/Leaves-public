@@ -82,7 +82,7 @@ export class LeavesController {
   // LEAVE POLICY
   // ===================================================
   @Post('leave-policy')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  
   @Roles(...ADMIN_ROLES)
   createPolicy(@Body() dto: CreatePolicyDto) {
     return this.service.leavePolicy.create(dto);
@@ -99,7 +99,7 @@ export class LeavesController {
   }
 
   @Patch('leave-policy/:id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  
   @Roles(...ADMIN_ROLES)
   updatePolicy(@Param('id') id: string, @Body() dto: UpdatePolicyDto) {
     return this.service.leavePolicy.update(id, dto);
@@ -107,7 +107,7 @@ export class LeavesController {
 
 
   @Delete('leave-policy/:id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  
   @Roles(...ADMIN_ROLES)
   removePolicy(@Param('id') id: string) {
     return this.service.leavePolicy.remove(id);

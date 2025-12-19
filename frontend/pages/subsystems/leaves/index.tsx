@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Calendar,
@@ -10,15 +10,36 @@ import {
   Sparkles,
 } from "lucide-react";
 
+import { useAuth } from "@/hooks/useAuth";
+import { isAdmin } from "@/utils/roles";
+
 export default function LeavesHome() {
+  const { user } = useAuth();
+
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // ⛔ Prevent hydration mismatch
+  if (!mounted) return null;
+
+  const canManageLeaves = isAdmin(user?.roles);
+
   const features = [
-    {
-      title: "Leave Types",
-      desc: "Define and manage all leave categories such as annual, sick, unpaid, and more.",
-      icon: <FileEdit className="w-8 h-8" />,
-      link: "/subsystems/leaves/types",
-      gradient: "from-blue-500 to-cyan-500",
-    },
+    ...(canManageLeaves
+      ? [
+          {
+            title: "Leave Types",
+            desc: "Define and manage all leave categories such as annual, sick, unpaid, and more.",
+            icon: <FileEdit className="w-8 h-8" />,
+            link: "/subsystems/leaves/types",
+            gradient: "from-blue-500 to-cyan-500",
+          },
+        ]
+      : []),
+
     {
       title: "Leave Policies",
       desc: "Configure rules for accruals, carryovers, limits, and eligibility.",
@@ -51,12 +72,12 @@ export default function LeavesHome() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-white px-6 py-24">
-
-      {/* Title Section */}
       <div className="max-w-5xl mx-auto text-center mb-20">
         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/20 mb-6">
           <Sparkles className="w-4 h-4 text-cyan-400" />
-          <span className="text-sm text-cyan-400">Leaves Management Module</span>
+          <span className="text-sm text-cyan-400">
+            Leaves Management Module
+          </span>
         </div>
 
         <h1 className="text-5xl font-light mb-4">
@@ -66,24 +87,19 @@ export default function LeavesHome() {
         </h1>
 
         <p className="text-gray-300 max-w-2xl mx-auto">
-          Manage all leave-related configurations, policies, requests, entitlements, 
-          and calendar scheduling in one unified place.
+          Manage all leave-related configurations, policies, requests,
+          entitlements, and calendar scheduling in one unified place.
         </p>
       </div>
 
-      {/* Feature Cards */}
       <div className="max-w-6xl mx-auto grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
         {features.map((f, index) => (
           <Link key={index} href={f.link}>
             <div className="group cursor-pointer relative">
-              {/* Glow */}
               <div
                 className={`absolute inset-0 bg-gradient-to-br ${f.gradient} opacity-0 group-hover:opacity-30 blur-xl transition-all rounded-3xl`}
               />
-
-              {/* Card */}
               <div className="relative p-8 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-xl group-hover:border-white/20 transition-all hover:-translate-y-2">
-                {/* Icon */}
                 <div className="mb-5 relative">
                   <div
                     className={`absolute inset-0 bg-gradient-to-br ${f.gradient} opacity-50 blur-md rounded-2xl`}
@@ -96,7 +112,6 @@ export default function LeavesHome() {
                 </div>
 
                 <h3 className="text-2xl mb-3">{f.title}</h3>
-
                 <p className="text-gray-400 mb-4 leading-relaxed">{f.desc}</p>
 
                 <div className="flex items-center gap-2 text-cyan-400 opacity-0 group-hover:opacity-100 transition-all">

@@ -3,7 +3,7 @@ import { createLeaveRequest } from "@/services/leaves/leaveRequests.api";
 import { getLeaveTypes } from "@/services/leaves/leaveTypes.api";
 import { useRouter } from "next/router";
 import { useAuth } from "@/hooks/useAuth";
-import { isEmployee } from "@/utils/roles";
+import { SystemRole } from "@/enums/SystemRole";
 
 interface LeaveType {
   _id: string;
@@ -14,24 +14,46 @@ export default function CreateRequestPage() {
   const { user } = useAuth();
   const router = useRouter();
 
-  // 🔒 EMPLOYEE ONLY
-  if (!isEmployee(user?.roles)) {
+  // ✅ ALL HOOKS MUST BE HERE — NO CONDITIONS ABOVE
+  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
+  const [leaveTypeId, setLeaveTypeId] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [justification, setJustification] = useState("");
+  const [authReady, setAuthReady] = useState(false);
+
+  // ✅ wait until auth is loaded (prevents hydration issues)
+  useEffect(() => {
+    if (user !== undefined) {
+      setAuthReady(true);
+    }
+  }, [user]);
+
+  // ✅ fetch leave types AFTER auth
+  useEffect(() => {
+    if (!authReady) return;
+
+    getLeaveTypes().then((res) => {
+      setLeaveTypes(res.data || []);
+    });
+  }, [authReady]);
+
+  // 🔐 role check (NO HOOKS HERE)
+  const isAllowed =
+    user?.roles?.includes(SystemRole.HR_EMPLOYEE) ||
+    user?.roles?.includes(SystemRole.DEPARTMENT_EMPLOYEE);
+
+  if (!authReady) {
+    return null;
+  }
+
+  if (!isAllowed) {
     return (
       <div className="min-h-screen flex items-center justify-center text-red-400">
         Unauthorized – employees only
       </div>
     );
   }
-
-  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
-  const [leaveTypeId, setLeaveTypeId] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [justification, setJustification] = useState("");
-
-  useEffect(() => {
-    getLeaveTypes().then((res) => setLeaveTypes(res.data || []));
-  }, []);
 
   const handleSubmit = async () => {
     if (!leaveTypeId || !startDate || !endDate) {
@@ -41,7 +63,7 @@ export default function CreateRequestPage() {
 
     try {
       await createLeaveRequest({
-        employeeId: user!.id, // ✅ FIX — REQUIRED BY BACKEND
+        employeeId: user!.id,
         leaveTypeId,
         startDate,
         endDate,
@@ -58,11 +80,9 @@ export default function CreateRequestPage() {
   return (
     <div className="min-h-screen p-10 bg-slate-900 text-white">
       <div className="max-w-lg mx-auto bg-slate-800 p-6 rounded-xl border border-white/10">
-
         <h1 className="text-3xl mb-6 font-semibold">New Leave Request</h1>
 
         <div className="space-y-4">
-
           <div>
             <label className="text-gray-300 text-sm">Leave Type</label>
             <select
@@ -110,7 +130,6 @@ export default function CreateRequestPage() {
               onChange={(e) => setJustification(e.target.value)}
             />
           </div>
-
         </div>
 
         <div className="flex justify-end mt-6">

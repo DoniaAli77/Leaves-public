@@ -1,3 +1,4 @@
+import dynamic from "next/dynamic";
 import React, { useEffect, useState } from "react";
 import { FiMenu } from "react-icons/fi";
 
@@ -14,6 +15,8 @@ import {
 } from "@/services/leaves/leaveTypes.api";
 
 import { getLeaveCategories } from "@/services/leaves/leaveCategories.api";
+import { useAuth } from "@/hooks/useAuth";
+import { isAdmin } from "@/utils/roles";
 
 interface LeaveType {
   _id: string;
@@ -28,7 +31,32 @@ interface LeaveCategory {
   name: string;
 }
 
-export default function Page() {
+function Page() {
+  const { user } = useAuth();
+  const canManageLeaveTypes = isAdmin(user?.roles);
+
+  // ⛔ WAIT FOR USER, THEN HARD BLOCK NON-ADMINS
+  if (!user) return null;
+
+  if (!canManageLeaveTypes) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-white">
+        <div className="text-center max-w-md">
+          <h2 className="text-2xl font-semibold mb-4">
+            Access Restricted
+          </h2>
+          <p className="text-gray-300 leading-relaxed">
+            Only{" "}
+            <span className="text-cyan-400 font-medium">
+              HR Administrators
+            </span>{" "}
+            are allowed to view and manage leave types.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
   const [categories, setCategories] = useState<LeaveCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,28 +64,21 @@ export default function Page() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<LeaveType | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-
-  const [drawerOpen, setDrawerOpen] = useState(false); // <-- NEW
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const loadLeaveTypes = async () => {
     try {
       setLoading(true);
       const res = await getLeaveTypes();
       setLeaveTypes(res.data || []);
-    } catch (err) {
-      console.error("Failed to load leave types", err);
     } finally {
       setLoading(false);
     }
   };
 
   const loadCategories = async () => {
-    try {
-      const res = await getLeaveCategories();
-      setCategories(res.data || []);
-    } catch (err) {
-      console.error("Failed to load categories", err);
-    }
+    const res = await getLeaveCategories();
+    setCategories(res.data || []);
   };
 
   useEffect(() => {
@@ -66,36 +87,26 @@ export default function Page() {
   }, []);
 
   const handleSubmit = async (data: any) => {
-    try {
-      if (editing) {
-        await updateLeaveType(editing._id, data);
-      } else {
-        await createLeaveType(data);
-      }
-      setShowForm(false);
-      setEditing(null);
-      await loadLeaveTypes();
-    } catch (err) {
-      console.error("Error submitting leave type", err);
-      alert("Error occurred — see console.");
+    if (editing) {
+      await updateLeaveType(editing._id, data);
+    } else {
+      await createLeaveType(data);
     }
+
+    setShowForm(false);
+    setEditing(null);
+    loadLeaveTypes();
   };
 
   const confirmDelete = async () => {
     if (!deleteId) return;
-    try {
-      await deleteLeaveType(deleteId);
-      setDeleteId(null);
-      await loadLeaveTypes();
-    } catch (err) {
-      console.error("Error deleting leave type", err);
-    }
+    await deleteLeaveType(deleteId);
+    setDeleteId(null);
+    loadLeaveTypes();
   };
 
   return (
     <div className="min-h-screen relative bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-10 text-white">
-
-      {/* HAMBURGER ICON (TOP-LEFT) */}
       <button
         className="absolute top-6 left-6 text-white text-3xl hover:text-cyan-400 transition"
         onClick={() => setDrawerOpen(true)}
@@ -103,7 +114,6 @@ export default function Page() {
         <FiMenu />
       </button>
 
-      {/* CATEGORY DRAWER */}
       <CategoryDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
@@ -127,8 +137,6 @@ export default function Page() {
 
         {loading ? (
           <p className="text-gray-400">Loading...</p>
-        ) : leaveTypes.length === 0 ? (
-          <p className="text-gray-400">No leave types found.</p>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {leaveTypes.map((lt) => (
@@ -171,3 +179,5 @@ export default function Page() {
     </div>
   );
 }
+
+export default dynamic(() => Promise.resolve(Page), { ssr: false });

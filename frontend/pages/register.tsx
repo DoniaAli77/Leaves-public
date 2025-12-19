@@ -1,160 +1,242 @@
-import React, { useState } from "react";
+ import React, { useState } from "react";
+import { useRouter } from "next/router";
 import api from "../api/axios";
 
-interface RegisterForm {
-  employeeNumber: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-  nationalId: string;
-  dateOfHire: string;
-  role: string;
-  city: string;   // UI only
-  street: string; // UI only
-}
+type HRRole = "HR_ADMIN" | "HR_MANAGER" | "HR_EMPLOYEE" | "";
 
-const RegisterPage: React.FC = () => {
-  const [form, setForm] = useState<RegisterForm>({
+export default function RegisterPage() {
+  const router = useRouter();
+
+  const [form, setForm] = useState({
     employeeNumber: "",
     password: "",
     firstName: "",
     lastName: "",
     nationalId: "",
     dateOfHire: "",
-    role: "DEPARTMENT_EMPLOYEE",
     city: "",
     street: "",
+    role: "" as HRRole,
   });
 
-  const [msg, setMsg] = useState<string>("");
+ const [msg, setMsg] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const update = (k: keyof RegisterForm, v: string) =>
-    setForm((prev) => ({ ...prev, [k]: v }));
+  function update(field: string, value: string) {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  }
 
-  const handleRegister = async (
-    e: React.FormEvent<HTMLFormElement>
-  ): Promise<void> => {
+  // ===============================
+  // ✅ VALIDATE EMPLOYEE NUMBER
+  // ===============================
+  function isValidHRNumber(employeeNumber: string, role: HRRole) {
+    const n = employeeNumber.toUpperCase();
+     
+    if (role === "HR_ADMIN") return n.startsWith("HRADM");
+    if (role === "HR_MANAGER")
+      return n.startsWith("HRMAN") || n.startsWith("HRM");
+    if (role === "HR_EMPLOYEE") return n.startsWith("HRE");
+
+    return false;
+  }
+
+  async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     setMsg("");
 
+    if (!form.role) {
+      setMsg("Please select HR role ❌");
+      return;
+    }
+
+    if (!isValidHRNumber(form.employeeNumber, form.role)) {
+      setMsg(
+        "Employee number does NOT match selected role ❌"
+      );
+      return;
+    }
+
     try {
-      // ✅ SEND ONLY WHAT BACKEND EXPECTS
+      setLoading(true);
+
       await api.post("/auth/register", {
         employeeNumber: form.employeeNumber,
         password: form.password,
-        role: form.role,
         firstName: form.firstName,
         lastName: form.lastName,
         nationalId: form.nationalId,
         dateOfHire: form.dateOfHire,
+        role: form.role,
+        address: {
+          city: form.city,
+          street: form.street,
+        },
       });
 
-      setMsg("Registration successful 🎉");
-      setTimeout(() => {
-        window.location.href = "/login";
-      }, 1200);
+      alert("HR account registered successfully ✅");
+      router.push("/login");
     } catch (err: any) {
       setMsg(err.response?.data?.message || "Registration failed ❌");
+    } finally {
+      setLoading(false);
     }
-  };
+  }
+
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950">
-      <form
-        onSubmit={handleRegister}
-        className="bg-white/10 p-8 rounded-xl w-full max-w-xl space-y-4"
-      >
-        <h1 className="text-2xl text-white text-center">Register</h1>
+  <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-white">
+    <div className="w-full max-w-md glass-card p-8">
 
-        {/* Employee Number */}
-        <input
-          placeholder="Employee Number"
-          value={form.employeeNumber}
-          onChange={(e) => update("employeeNumber", e.target.value)}
-          required
-          className="w-full p-3 bg-white/5 rounded text-white"
-        />
+      <h1 className="text-3xl font-semibold text-center mb-2">
+        HR Registration
+      </h1>
 
-        {/* Password */}
-        <input
-          type="password"
-          placeholder="Password"
-          value={form.password}
-          onChange={(e) => update("password", e.target.value)}
-          required
-          className="w-full p-3 bg-white/5 rounded text-white"
-        />
+      <p className="text-center text-white/70 mb-6">
+        Create an HR account
+      </p>
 
-        {/* First Name */}
-        <input
-          placeholder="First Name"
-          value={form.firstName}
-          onChange={(e) => update("firstName", e.target.value)}
-          required
-          className="w-full p-3 bg-white/5 rounded text-white"
-        />
+      <form onSubmit={handleRegister} className="space-y-4">
 
-        {/* Last Name */}
-        <input
-          placeholder="Last Name"
-          value={form.lastName}
-          onChange={(e) => update("lastName", e.target.value)}
-          required
-          className="w-full p-3 bg-white/5 rounded text-white"
-        />
+        {/* HR NUMBER */}
+        <div>
+          <label className="text-sm text-white/70">
+            HR Employee Number
+          </label>
+          <input
+            className="input"
+            placeholder="HRE1003 / HRMAN1001 / HRADM1001"
+            value={form.employeeNumber}
+            onChange={(e) =>
+              update("employeeNumber", e.target.value)
+            }
+            required
+          />
+        </div>
 
-        {/* National ID */}
-        <input
-          placeholder="National ID"
-          value={form.nationalId}
-          onChange={(e) => update("nationalId", e.target.value)}
-          required
-          className="w-full p-3 bg-white/5 rounded text-white"
-        />
+        {/* PASSWORD */}
+        <div>
+          <label className="text-sm text-white/70">
+            Password
+          </label>
+          <input
+            className="input"
+            type="password"
+            placeholder="••••••••"
+            value={form.password}
+            onChange={(e) => update("password", e.target.value)}
+            required
+          />
+        </div>
 
-        {/* Date of Hire */}
-        <input
-          type="date"
-          value={form.dateOfHire}
-          onChange={(e) => update("dateOfHire", e.target.value)}
-          required
-          className="w-full p-3 bg-white/5 rounded text-white"
-        />
+        {/* NAME */}
+        <div className="grid grid-cols-2 gap-3">
+          <input
+            className="input"
+            placeholder="First Name"
+            value={form.firstName}
+            onChange={(e) => update("firstName", e.target.value)}
+            required
+          />
+          <input
+            className="input"
+            placeholder="Last Name"
+            value={form.lastName}
+            onChange={(e) => update("lastName", e.target.value)}
+            required
+          />
+        </div>
 
-        {/* Role */}
-        <select
-          value={form.role}
-          onChange={(e) => update("role", e.target.value)}
-          className="w-full p-3 bg-white/5 rounded text-white"
+        {/* NATIONAL ID */}
+        <div>
+          <input
+            className="input"
+            placeholder="National ID"
+            value={form.nationalId}
+            onChange={(e) => update("nationalId", e.target.value)}
+            required
+          />
+        </div>
+
+        {/* ROLE */}
+        <div>
+          <label className="text-sm text-white/70">
+            HR Role
+          </label>
+          <select
+            className="input"
+            value={form.role}
+            onChange={(e) =>
+              update("role", e.target.value)
+            }
+            required
+          >
+            <option value="">Select HR Role</option>
+            <option value="HR_ADMIN">HR Admin</option>
+            <option value="HR_MANAGER">HR Manager</option>
+            <option value="HR_EMPLOYEE">HR Employee</option>
+          </select>
+        </div>
+
+        {/* DATE */}
+        <div>
+          <label className="text-sm text-white/70">
+            Date of Hire
+          </label>
+          <input
+            className="input"
+            type="date"
+            value={form.dateOfHire}
+            onChange={(e) =>
+              update("dateOfHire", e.target.value)
+            }
+            required
+          />
+        </div>
+
+        {/* ADDRESS */}
+        <div className="grid grid-cols-2 gap-3">
+          <input
+            className="input"
+            placeholder="City"
+            value={form.city}
+            onChange={(e) => update("city", e.target.value)}
+          />
+          <input
+            className="input"
+            placeholder="Street"
+            value={form.street}
+            onChange={(e) => update("street", e.target.value)}
+          />
+        </div>
+
+        {/* SUBMIT */}
+        <button
+          type="submit"
+          disabled={loading}
+          className="glow-btn w-full mt-2"
         >
-          <option value="DEPARTMENT_EMPLOYEE">Department Employee</option>
-          <option value="ADMIN">Admin</option>
-          <option value="HR_MANAGER">HR Manager</option>
-        </select>
-
-        {/* Optional UI-only fields (NOT sent) */}
-        <input
-          placeholder="City (optional)"
-          value={form.city}
-          onChange={(e) => update("city", e.target.value)}
-          className="w-full p-3 bg-white/5 rounded text-white"
-        />
-
-        <input
-          placeholder="Street (optional)"
-          value={form.street}
-          onChange={(e) => update("street", e.target.value)}
-          className="w-full p-3 bg-white/5 rounded text-white"
-        />
-
-        <button className="w-full py-3 bg-blue-600 rounded-xl">
-          Register
+          {loading ? "Registering..." : "Register HR"}
         </button>
-
-        {msg && <p className="text-center mt-4 text-white">{msg}</p>}
       </form>
-    </div>
-  );
-};
 
-export default RegisterPage;
+      {/* ERROR */}
+      {msg && (
+        <p className="text-center mt-4 text-red-400">
+          {msg}
+        </p>
+      )}
+
+      {/* FOOTER */}
+      <p className="text-center text-sm text-white/60 mt-6">
+        Already have an account?{" "}
+        <span
+          onClick={() => router.push("/login")}
+          className="text-cyan-300 cursor-pointer hover:underline"
+        >
+          Login
+        </span>
+      </p>
+    </div>
+  </div>
+);
+}

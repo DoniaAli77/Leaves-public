@@ -19,7 +19,12 @@ import { LeavesController } from './leaves.controller';
 
 @Module({
   imports: [
-    JwtModule, // ✅ REQUIRED for JwtAuthGuard
+    // ✅ PROVIDE JwtService LOCALLY (NO AUTH MODULE CHANGE)
+    JwtModule.register({
+      secret: process.env.JWT_SECRET || 'SUPER_SECRET_KEY_CHANGE_THIS',
+      signOptions: { expiresIn: '2h' },
+    }),
+
     MongooseModule.forFeature([
       { name: LeaveType.name, schema: LeaveTypeSchema },
       { name: LeaveCategory.name, schema: LeaveCategorySchema },
@@ -30,11 +35,11 @@ import { LeavesController } from './leaves.controller';
       { name: LeaveAdjustment.name, schema: LeaveAdjustmentSchema },
       { name: Calendar.name, schema: CalendarSchema },
     ]),
+
     EmployeeProfileModule,
     TimeManagementModule,
   ],
   controllers: [LeavesController],
   providers: [LeavesService],
-  exports: [LeavesService],
 })
 export class LeavesModule {}
