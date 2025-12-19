@@ -14,7 +14,6 @@ export default function CreateRequestPage() {
   const { user } = useAuth();
   const router = useRouter();
 
-  // ✅ ALL HOOKS MUST BE HERE — NO CONDITIONS ABOVE
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
   const [leaveTypeId, setLeaveTypeId] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -22,30 +21,22 @@ export default function CreateRequestPage() {
   const [justification, setJustification] = useState("");
   const [authReady, setAuthReady] = useState(false);
 
-  // ✅ wait until auth is loaded (prevents hydration issues)
   useEffect(() => {
     if (user !== undefined) {
       setAuthReady(true);
     }
   }, [user]);
 
-  // ✅ fetch leave types AFTER auth
   useEffect(() => {
     if (!authReady) return;
-
-    getLeaveTypes().then((res) => {
-      setLeaveTypes(res.data || []);
-    });
+    getLeaveTypes().then((res) => setLeaveTypes(res.data || []));
   }, [authReady]);
 
-  // 🔐 role check (NO HOOKS HERE)
   const isAllowed =
     user?.roles?.includes(SystemRole.HR_EMPLOYEE) ||
     user?.roles?.includes(SystemRole.DEPARTMENT_EMPLOYEE);
 
-  if (!authReady) {
-    return null;
-  }
+  if (!authReady) return null;
 
   if (!isAllowed) {
     return (
@@ -63,12 +54,13 @@ export default function CreateRequestPage() {
 
     try {
       await createLeaveRequest({
-        employeeId: user!.id,
+        employeeProfile: user!.id, // ✅ KEY CHANGE
         leaveTypeId,
         startDate,
         endDate,
         justification,
       });
+
 
       router.push("/subsystems/leaves/requests");
     } catch (err) {
@@ -83,53 +75,39 @@ export default function CreateRequestPage() {
         <h1 className="text-3xl mb-6 font-semibold">New Leave Request</h1>
 
         <div className="space-y-4">
-          <div>
-            <label className="text-gray-300 text-sm">Leave Type</label>
-            <select
-              className="w-full p-2 rounded bg-slate-700"
-              value={leaveTypeId}
-              onChange={(e) => setLeaveTypeId(e.target.value)}
-            >
-              <option value="">Choose type</option>
-              {leaveTypes.map((t) => (
-                <option key={t._id} value={t._id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <select
+            className="w-full p-2 rounded bg-slate-700"
+            value={leaveTypeId}
+            onChange={(e) => setLeaveTypeId(e.target.value)}
+          >
+            <option value="">Choose type</option>
+            {leaveTypes.map((t) => (
+              <option key={t._id} value={t._id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
 
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <label className="text-gray-300 text-sm">Start Date</label>
-              <input
-                type="date"
-                className="w-full p-2 rounded bg-slate-700"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
-            </div>
+          <input
+            type="date"
+            className="w-full p-2 rounded bg-slate-700"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
 
-            <div className="flex-1">
-              <label className="text-gray-300 text-sm">End Date</label>
-              <input
-                type="date"
-                className="w-full p-2 rounded bg-slate-700"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
-            </div>
-          </div>
+          <input
+            type="date"
+            className="w-full p-2 rounded bg-slate-700"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
 
-          <div>
-            <label className="text-gray-300 text-sm">Justification</label>
-            <textarea
-              className="w-full p-2 rounded bg-slate-700"
-              rows={3}
-              value={justification}
-              onChange={(e) => setJustification(e.target.value)}
-            />
-          </div>
+          <textarea
+            className="w-full p-2 rounded bg-slate-700"
+            rows={3}
+            value={justification}
+            onChange={(e) => setJustification(e.target.value)}
+          />
         </div>
 
         <div className="flex justify-end mt-6">

@@ -1,24 +1,36 @@
 import { SystemRole } from "../enums/SystemRole";
-//import { SystemRole } from "../../backend/employee-profile/enums/employee-profile.enums";
 
-
+/**
+ * =========================
+ * ADMIN ROLES
+ * =========================
+ */
 export const ADMIN_ROLES: SystemRole[] = [
   SystemRole.SYSTEM_ADMIN,
   SystemRole.LEGAL_POLICY_ADMIN,
   SystemRole.HR_ADMIN,
 ];
 
-export function isAdmin(userRoles?: string[]) {
+/**
+ * =========================
+ * ROLE CHECK HELPERS
+ * =========================
+ */
+
+export function isAdmin(userRoles?: SystemRole[]) {
   if (!userRoles) return false;
-  return userRoles.some((role) => ADMIN_ROLES.includes(role as SystemRole));
+  return userRoles.some((role) => ADMIN_ROLES.includes(role));
 }
 
-export function isEmployee(userRoles?: string[]) {
+export function isEmployee(userRoles?: SystemRole[]) {
   if (!userRoles) return false;
-  return userRoles.includes(SystemRole.DEPARTMENT_EMPLOYEE);
+  return (
+    userRoles.includes(SystemRole.DEPARTMENT_EMPLOYEE) ||
+    userRoles.includes(SystemRole.HR_EMPLOYEE)
+  );
 }
 
-export function isManager(userRoles?: string[]) {
+export function isManager(userRoles?: SystemRole[]) {
   if (!userRoles) return false;
   return (
     userRoles.includes(SystemRole.DEPARTMENT_HEAD) ||

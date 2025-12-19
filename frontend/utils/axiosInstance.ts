@@ -1,4 +1,3 @@
-// utils/axiosInstance.ts
 import axios from "axios";
 
 const axiosInstance = axios.create({
@@ -8,43 +7,22 @@ const axiosInstance = axios.create({
   },
 });
 
-/**
- * 🔐 Attach auth headers expected by backend
- */
-axiosInstance.interceptors.request.use(
-  (config) => {
-    if (typeof window !== "undefined") {
-      const token = localStorage.getItem("token");
-      const userId = localStorage.getItem("userid");
-      const role = localStorage.getItem("role");
+axiosInstance.interceptors.request.use((config) => {
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("token");
 
-      // BACKEND EXPECTS THESE 👇
-      if (userId) {
-        config.headers["x-user-id"] = userId;
-      }
-
-      if (role) {
-        config.headers["x-user-role"] = role;
-      }
-
-      // Optional: keep JWT for future migration
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
+  }
+  return config;
+});
 
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
+// Log backend errors nicely
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
-    console.error(
-      "API Error:",
-      error?.response?.data ?? error?.message
-    );
+    console.error("API Error:", error?.response?.data ?? error?.message);
     return Promise.reject(error);
   }
 );
