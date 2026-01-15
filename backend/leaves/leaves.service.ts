@@ -214,40 +214,59 @@ export class LeavesService {
   // ============================================================
 
   /**
-   * View Team Members’ Leave Balances and Upcoming Leaves
+   ** Requirement #4:
+   *  here we allow viewing Team Members’ Leave Balances and Upcoming Leaves
    * Role: Direct Manager (Department Head)
-   */
-  async getTeamLeaves(managerId: string): Promise<TeamLeaveSummary[]> {
-    const team = await this.employeeProfileService.getTeamSummaryForManager(
-      managerId,
-    );
+ * Direct Manager views team leave balances + upcoming approved leaves.
+ *
+ * IMPORTANT:
+ * - JWT gives us manager """"EMPLOYEE"" id
+ * - But team relation uses supervisorPositionId (a POSITION id)
+ * - So we convert: managerEmployeeId -> manager.primaryPositionId -> team
+ */
+async getTeamLeaves(managerEmployeeId: string): Promise<TeamLeaveSummary[]> {
+  // 1) Load manager profile to get their POSITION id
+  const manager = await this.employeeProfileService.findOne(managerEmployeeId);
 
-    const summaries: TeamLeaveSummary[] = [];
+  const managerPositionId =
+    (manager as any).primaryPositionId?._id ?? (manager as any).primaryPositionId;
 
-    for (const member of team) {
-      const entitlements = await this.entitlementModel
-        .find({ employeeId: member._id })
-        .populate('leaveTypeId')
-        .exec();
-
-      const upcomingRequests = await this.requestModel
-        .find({
-          employeeId: member._id,
-          status: LeaveStatus.APPROVED,
-          'dates.to': { $gte: new Date() },
-        })
-        .sort({ 'dates.from': 1 })
-        .exec();
-
-      summaries.push({
-        employee: member,
-        entitlements,
-        upcomingRequests,
-      });
-    }
-
-    return summaries;
+  if (!managerPositionId) {
+    throw new BadRequestException('Manager has no primaryPositionId');
   }
+
+  // 2) Now fetch team using POSITION id (matches our DB supervisorPositionId field)
+  const team = await this.employeeProfileService.getTeamSummaryForManager(
+    managerPositionId.toString(),
+  );
+
+  const summaries: TeamLeaveSummary[] = [];
+
+  for (const member of team) {
+    const entitlements = await this.entitlementModel
+      .find({ employeeId: member._id })
+      .populate('leaveTypeId')
+      .exec();
+
+    const upcomingRequests = await this.requestModel
+      .find({
+        employeeId: member._id,
+        status: LeaveStatus.APPROVED,
+        'dates.to': { $gte: new Date() },
+      })
+      .sort({ 'dates.from': 1 })
+      .exec();
+
+    summaries.push({
+      employee: member as any,
+      entitlements,
+      upcomingRequests,
+    });
+  }
+
+  return summaries;
+}
+
 
   // ============================================================
   // LEAVE CATEGORY
