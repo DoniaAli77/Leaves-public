@@ -12,9 +12,19 @@ import {
   ValidationPipe,
   UsePipes,
   ParseIntPipe,
+  Query,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
 
+import type { Request } from 'express';
+
+
 import { LeavesService } from './leaves.service';
+
+// DTOs
+import { BulkLeaveRequestDto } from './dto/bulk-leave-request.dto';
+import { FilterLeaveRequestsDto } from './dto/filter-leave-requests.dto';
 
 import { CreateLeaveTypeDto } from './dto/create-leave-type.dto';
 import { UpdateLeaveTypeDto } from './dto/update-leave-type.dto';
@@ -32,15 +42,15 @@ import { UpdateCalendarDto } from './dto/update-calendar.dto';
 import { CreateBlockedPeriodDto } from './dto/create-blocked-period.dto';
 import { CreateLeaveCategoryDto } from './dto/create-leave-category.dto';
 
-import { UseGuards } from '@nestjs/common';
-
+// Auth & Roles
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { ADMIN_ROLES } from '../common/constants/role-groups';
-
+import { SystemRole } from '../employee-profile/enums/employee-profile.enums';
 
 @Controller()
+@UseGuards(JwtAuthGuard, RolesGuard) // ✅ applies JWT + role checking to ALL endpoints
 export class LeavesController {
   constructor(private readonly service: LeavesService) {}
 
@@ -48,6 +58,7 @@ export class LeavesController {
   // LEAVE TYPE
   // ===================================================
   @Post('leave-type')
+  @UsePipes(new ValidationPipe({ whitelist: true }))
   createLeaveType(@Body() dto: CreateLeaveTypeDto) {
     return this.service.leaveType.create(dto);
   }
@@ -68,6 +79,7 @@ export class LeavesController {
   }
 
   @Patch('leave-type/:id')
+  @UsePipes(new ValidationPipe({ whitelist: true }))
   updateLeaveType(@Param('id') id: string, @Body() dto: UpdateLeaveTypeDto) {
     return this.service.leaveType.update(id, dto);
   }
@@ -82,8 +94,8 @@ export class LeavesController {
   // LEAVE POLICY
   // ===================================================
   @Post('leave-policy')
-  
   @Roles(...ADMIN_ROLES)
+  @UsePipes(new ValidationPipe({ whitelist: true }))
   createPolicy(@Body() dto: CreatePolicyDto) {
     return this.service.leavePolicy.create(dto);
   }
@@ -99,44 +111,53 @@ export class LeavesController {
   }
 
   @Patch('leave-policy/:id')
-  
   @Roles(...ADMIN_ROLES)
+  @UsePipes(new ValidationPipe({ whitelist: true }))
   updatePolicy(@Param('id') id: string, @Body() dto: UpdatePolicyDto) {
     return this.service.leavePolicy.update(id, dto);
   }
 
-
   @Delete('leave-policy/:id')
-  
   @Roles(...ADMIN_ROLES)
+  @HttpCode(HttpStatus.NO_CONTENT)
   removePolicy(@Param('id') id: string) {
     return this.service.leavePolicy.remove(id);
   }
 
+  // ===================================================
+  // ✅ REQUIREMENT 1: POLICY EXPIRY CHECK (HR Admin)
+  // ===================================================
+  @Patch('leave-policy/check-expiry')
+  @Roles(...ADMIN_ROLES)
+  checkPolicyExpiry() {
+    return this.service.leavePolicy.checkExpiryRules();
+  }
 
   // ===================================================
-// LEAVE CATEGORY
-// ===================================================
-@Post('leave-category')
-createCategory(@Body() dto: CreateLeaveCategoryDto) {
-  return this.service.leaveCategory.create(dto);
-}
+  // LEAVE CATEGORY
+  // ===================================================
+  @Post('leave-category')
+  @UsePipes(new ValidationPipe({ whitelist: true }))
+  createCategory(@Body() dto: CreateLeaveCategoryDto) {
+    return this.service.leaveCategory.create(dto);
+  }
 
-@Get('leave-category')
-findAllCategories() {
-  return this.service.leaveCategory.findAll();
-}
+  @Get('leave-category')
+  findAllCategories() {
+    return this.service.leaveCategory.findAll();
+  }
 
-@Patch('leave-category/:id')
-updateCategory(@Param('id') id: string, @Body() dto: CreateLeaveCategoryDto) {
-  return this.service.leaveCategory.update(id, dto);
-}
+  @Patch('leave-category/:id')
+  @UsePipes(new ValidationPipe({ whitelist: true }))
+  updateCategory(@Param('id') id: string, @Body() dto: CreateLeaveCategoryDto) {
+    return this.service.leaveCategory.update(id, dto);
+  }
 
-@Delete('leave-category/:id')
-removeCategory(@Param('id') id: string) {
-  return this.service.leaveCategory.remove(id);
-}
-
+  @Delete('leave-category/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  removeCategory(@Param('id') id: string) {
+    return this.service.leaveCategory.remove(id);
+  }
 
   // ===================================================
   // LEAVE REQUEST
@@ -158,28 +179,62 @@ removeCategory(@Param('id') id: string) {
   }
 
   @Put('leave-request/:id')
+  @UsePipes(new ValidationPipe({ whitelist: true }))
   updateRequest(@Param('id') id: string, @Body() dto: UpdateLeaveRequestDto) {
     return this.service.leaveRequest.update(id, dto);
   }
 
   @Put('leave-request/:id/approve/manager')
+  @Roles(SystemRole.DEPARTMENT_HEAD) // direct manager
+  @UsePipes(new ValidationPipe({ whitelist: true }))
   approveReq(@Param('id') id: string, @Body() dto: ApproveRequestDto) {
     return this.service.leaveRequest.managerApprove(id, dto.approverId);
   }
 
   @Put('leave-request/:id/reject/manager')
+  @Roles(SystemRole.DEPARTMENT_HEAD) // direct manager
+  @UsePipes(new ValidationPipe({ whitelist: true }))
   rejectReq(@Param('id') id: string, @Body() dto: ApproveRequestDto) {
-    return this.service.leaveRequest.managerReject(
-      id,
-      dto.approverId,
-      dto.comment,
-    );
+    return this.service.leaveRequest.managerReject(id, dto.approverId, dto.comment);
   }
+
+  // ===================================================
+  // ✅ REQUIREMENT 2: BULK REQUEST PROCESSING (HR Manager)
+  // ===================================================
+  @Put('leave-request/bulk')
+  @Roles(SystemRole.HR_MANAGER)
+  @UsePipes(new ValidationPipe({ whitelist: true }))
+  bulkProcess(@Body() dto: BulkLeaveRequestDto) {
+    return this.service.leaveRequest.bulkProcess(dto);
+  }
+
+  // ===================================================
+  // ✅ REQUIREMENT 3: FILTER REQUEST HISTORY (All Roles)
+  // ===================================================
+  @Get('leave-request/history')
+  filterHistory(@Query() params: FilterLeaveRequestsDto) {
+    return this.service.leaveRequest.filter(params);
+  }
+
+  // ===================================================
+  // ✅ REQUIREMENT 4: VIEW TEAM BALANCES + UPCOMING LEAVES (Direct Manager)
+  // ===================================================
+  /**now here we will use the imports import { Req } from '@nestjs/common';
+     import { Request } from 'express'; */
+
+  @Get('manager/team-leaves')
+@Roles(SystemRole.DEPARTMENT_HEAD)
+getMyTeamLeaves(@Req() req: Request) {
+  const managerEmployeeId = (req as any).user.id;
+  return this.service.getTeamLeaves(managerEmployeeId);
+}
+
 
   // ===================================================
   // LEAVE ENTITLEMENT
   // ===================================================
   @Post('leave-entitlement')
+  @UsePipes(new ValidationPipe({ whitelist: true }))
   createEntitlement(@Body() dto: CreateLeaveEntitlementDto) {
     return this.service.leaveEntitlement.create(dto);
   }
@@ -190,14 +245,13 @@ removeCategory(@Param('id') id: string) {
   }
 
   @Put('leave-entitlement/:employeeId')
-  updateEnt(
-    @Param('employeeId') employeeId: string,
-    @Body() dto: UpdateLeaveEntitlementDto,
-  ) {
+  @UsePipes(new ValidationPipe({ whitelist: true }))
+  updateEnt(@Param('employeeId') employeeId: string, @Body() dto: UpdateLeaveEntitlementDto) {
     return this.service.leaveEntitlement.update(employeeId, dto);
   }
 
   @Delete('leave-entitlement/:employeeId')
+  @HttpCode(HttpStatus.NO_CONTENT)
   removeEnt(@Param('employeeId') employeeId: string) {
     return this.service.leaveEntitlement.removeByEmployee(employeeId);
   }
@@ -206,11 +260,14 @@ removeCategory(@Param('id') id: string) {
   // LEAVE ADJUSTMENT
   // ===================================================
   @Post('leave-adjustment')
+  @UsePipes(new ValidationPipe({ whitelist: true }))
   createAdjustment(@Body() dto: CreateAdjustmentDto) {
     return this.service.leaveAdjustment.create(dto);
   }
 
   @Put('leave-adjustment/:id/approve')
+  @Roles(SystemRole.HR_MANAGER)
+  @UsePipes(new ValidationPipe({ whitelist: true }))
   approveAdjustment(@Param('id') id: string, @Body() dto: ApproveAdjustmentDto) {
     return this.service.leaveAdjustment.approve(id, dto);
   }
@@ -219,6 +276,8 @@ removeCategory(@Param('id') id: string) {
   // CALENDAR
   // ===================================================
   @Post('calendar')
+  @Roles(...ADMIN_ROLES)
+  @UsePipes(new ValidationPipe({ whitelist: true }))
   createCalendar(@Body() dto: CreateCalendarDto) {
     return this.service.calendar.create(dto);
   }
@@ -229,6 +288,8 @@ removeCategory(@Param('id') id: string) {
   }
 
   @Patch('calendar/:year')
+  @Roles(...ADMIN_ROLES)
+  @UsePipes(new ValidationPipe({ whitelist: true }))
   updateCalendar(
     @Param('year', ParseIntPipe) year: number,
     @Body() dto: UpdateCalendarDto,
@@ -237,6 +298,8 @@ removeCategory(@Param('id') id: string) {
   }
 
   @Post('calendar/:year/blocked-period')
+  @Roles(...ADMIN_ROLES)
+  @UsePipes(new ValidationPipe({ whitelist: true }))
   addBlocked(
     @Param('year', ParseIntPipe) year: number,
     @Body() dto: CreateBlockedPeriodDto,
@@ -244,13 +307,13 @@ removeCategory(@Param('id') id: string) {
     return this.service.calendar.addBlockedPeriod(year, dto);
   }
 
-  // REMOVE BLOCKED PERIOD
   @Delete('calendar/:year/blocked-period/:index')
+  @Roles(...ADMIN_ROLES)
+  @HttpCode(HttpStatus.NO_CONTENT)
   removeBlockedPeriod(
     @Param('year', ParseIntPipe) year: number,
     @Param('index', ParseIntPipe) index: number,
   ) {
     return this.service.calendar.removeBlockedPeriod(year, index);
   }
-
 }

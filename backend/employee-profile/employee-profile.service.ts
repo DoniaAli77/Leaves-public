@@ -361,15 +361,27 @@ async rejectChangeRequest(id: string, reason: string) {
 }
 
 // Manager sees list of employees reporting to them (only summary)
-// Manager sees list of employees reporting to them (only summary)
-async getTeamSummaryForManager(managerId: string) {
+async getTeamSummaryForManager(managerEmployeeId: string) {
+  // Step 1: get the manager profile
+  const manager = await this.employeeModel.findById(managerEmployeeId).lean();
+  if (!manager) {
+    throw new NotFoundException('Manager not found');
+  }
+
+  // Step 2: manager MUST have a primaryPositionId (because employees point to supervisorPositionId)
+  if (!manager.primaryPositionId) {
+    throw new BadRequestException('Manager has no primaryPositionId');
+  }
+
+  // Step 3: find employees whose supervisorPositionId = manager.primaryPositionId
   return this.employeeModel
-    .find({ supervisorPositionId: managerId }) // ✅ FIXED FIELD
-    .select('firstName lastName primaryDepartmentId primaryPositionId employeeStatus')
+    .find({ supervisorPositionId: manager.primaryPositionId })
+    .select('firstName lastName primaryDepartmentId primaryPositionId status')
     .populate('primaryDepartmentId')
     .populate('primaryPositionId')
     .lean();
 }
+
 
 // Manager sees one employee but must belong to their team
 async getTeamEmployeeSummary(managerId: string, employeeId: string) {
