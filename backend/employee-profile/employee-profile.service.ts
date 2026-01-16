@@ -382,6 +382,27 @@ async getTeamSummaryForManager(managerEmployeeId: string) {
     .lean();
 }
 
+// ✅ Manager uses EMPLOYEE ID (from JWT), but team is linked by POSITION ID.
+async getTeamSummaryForManagerEmployeeId(managerEmployeeId: string) {
+  const manager = await this.employeeModel
+    .findById(managerEmployeeId)
+    .select('primaryPositionId')
+    .lean();
+
+  if (!manager) {
+    throw new NotFoundException('Manager profile not found');
+  }
+
+  if (!manager.primaryPositionId) {
+    throw new BadRequestException('Manager has no primaryPositionId set');
+  }
+
+  // reuse your existing function (expects supervisorPositionId == manager position id)
+  return this.getTeamSummaryForManager(manager.primaryPositionId.toString());
+}
+
+
+
 
 // Manager sees one employee but must belong to their team
 async getTeamEmployeeSummary(managerId: string, employeeId: string) {

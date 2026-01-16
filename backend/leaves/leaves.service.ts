@@ -224,21 +224,15 @@ export class LeavesService {
  * - But team relation uses supervisorPositionId (a POSITION id)
  * - So we convert: managerEmployeeId -> manager.primaryPositionId -> team
  */
+/**
+ * managerEmployeeId comes from JWT (req.user.id)
+ */
 async getTeamLeaves(managerEmployeeId: string): Promise<TeamLeaveSummary[]> {
-  // 1) Load manager profile to get their POSITION id
-  const manager = await this.employeeProfileService.findOne(managerEmployeeId);
-
-  const managerPositionId =
-    (manager as any).primaryPositionId?._id ?? (manager as any).primaryPositionId;
-
-  if (!managerPositionId) {
-    throw new BadRequestException('Manager has no primaryPositionId');
-  }
-
-  // 2) Now fetch team using POSITION id (matches our DB supervisorPositionId field)
-  const team = await this.employeeProfileService.getTeamSummaryForManager(
-    managerPositionId.toString(),
-  );
+  // ✅ get team by manager EMPLOYEE id -> internally mapped to manager POSITION id
+  const team =
+    await this.employeeProfileService.getTeamSummaryForManagerEmployeeId( //guys here we use this helper function made in employee-prof service
+      managerEmployeeId,
+    );
 
   const summaries: TeamLeaveSummary[] = [];
 
@@ -266,6 +260,14 @@ async getTeamLeaves(managerEmployeeId: string): Promise<TeamLeaveSummary[]> {
 
   return summaries;
 }
+
+
+
+
+
+
+
+
 
 
   // ============================================================
