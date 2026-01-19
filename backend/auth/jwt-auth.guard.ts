@@ -31,6 +31,7 @@ export class JwtAuthGuard implements CanActivate {
       req.user = {
         id: decoded.id,
         role: decoded.role,
+        roles: [decoded.role], // i added this line to support RolesGuard
         username: decoded.username,
       };
 

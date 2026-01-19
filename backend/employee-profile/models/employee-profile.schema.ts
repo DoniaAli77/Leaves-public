@@ -109,6 +109,7 @@ export class EmployeeProfile extends UserProfileBase {
 
   @Prop({ type: String })
   lastDevelopmentPlanSummary?: string;
+  
 }
 
 export const EmployeeProfileSchema =

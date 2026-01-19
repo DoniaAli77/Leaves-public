@@ -7,6 +7,7 @@ import {
 
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { EmployeeProfileService } from '../employee-profile/employee-profile.service';
 
 // models (singular)
 import { LeaveType, LeaveTypeDocument } from './models/leave-type.schema';
@@ -14,9 +15,16 @@ import { LeaveCategory } from './models/leave-category.schema';
 import { LeavePolicy, LeavePolicyDocument } from './models/leave-policy.schema';
 import { LeaveRequest, LeaveRequestDocument } from './models/leave-request.schema';
 import { Attachment } from './models/attachment.schema';
-import { LeaveEntitlement, LeaveEntitlementDocument } from './models/leave-entitlement.schema';
-import { LeaveAdjustment, LeaveAdjustmentDocument } from './models/leave-adjustment.schema';
+import {
+  LeaveEntitlement,
+  LeaveEntitlementDocument,
+} from './models/leave-entitlement.schema';
+import {
+  LeaveAdjustment,
+  LeaveAdjustmentDocument,
+} from './models/leave-adjustment.schema';
 import { Calendar, CalendarDocument } from './models/calendar.schema';
+import { EmployeeProfile } from '../employee-profile/models/employee-profile.schema';
 
 // DTOs
 import { CreateLeaveTypeDto } from './dto/create-leave-type.dto';
@@ -32,10 +40,21 @@ import { ApproveAdjustmentDto } from './dto/approve-adjustment.dto';
 import { CreateCalendarDto } from './dto/create-calendar.dto';
 import { UpdateCalendarDto } from './dto/update-calendar.dto';
 import { CreateBlockedPeriodDto } from './dto/create-blocked-period.dto';
+import { FilterLeaveRequestsDto } from './dto/filter-leave-requests.dto';
+import { BulkLeaveRequestDto } from './dto/bulk-leave-request.dto';
 
 // enums
 import { LeaveStatus } from './enums/leave-status.enum';
 import { AdjustmentType } from './enums/adjustment-type.enum';
+
+/**
+ * Returned structure for Direct Manager team view
+ */
+export interface TeamLeaveSummary {
+  employee: EmployeeProfile;
+  entitlements: LeaveEntitlementDocument[];
+  upcomingRequests: LeaveRequestDocument[];
+}
 
 @Injectable()
 export class LeavesService {
@@ -63,25 +82,214 @@ export class LeavesService {
 
     @InjectModel(Calendar.name)
     private calendarModel: Model<CalendarDocument>,
+
+    private readonly employeeProfileService: EmployeeProfileService,
   ) {}
 
+  // ============================================================
+  // PRIVATE HELPERS (Prevent Negative Balance)
+  // ============================================================
 
+  private recomputeRemaining(ent: LeaveEntitlementDocument) {
+    ent.remaining =
+      ent.yearlyEntitlement + ent.carryForward - ent.taken - ent.pending;
+  }
+
+  private async getEntitlementOrThrow(
+    employeeId: Types.ObjectId,
+    leaveTypeId: Types.ObjectId,
+  ) {
+    const ent = await this.entitlementModel.findOne({
+      employeeId,
+      leaveTypeId,
+    });
+    if (!ent) throw new NotFoundException('Leave entitlement not found');
+    return ent;
+  }
+
+  /**
+   * Reserve leave days for a PENDING request:
+   * pending += days; remaining recalculated; remaining must not be negative.
+   */
+  private async reservePending(
+    employeeId: Types.ObjectId,
+    leaveTypeId: Types.ObjectId,
+    days: number,
+  ) {
+    const ent = await this.getEntitlementOrThrow(employeeId, leaveTypeId);
+
+    // Ensure enough remaining BEFORE reserving
+    if (ent.remaining < days) {
+      throw new BadRequestException('Insufficient leave balance');
+    }
+
+    ent.pending += days;
+    this.recomputeRemaining(ent);
+
+    if (ent.remaining < 0) {
+      throw new BadRequestException('Insufficient leave balance');
+    }
+
+    await ent.save();
+  }
+
+  /**
+   * Release pending leave days when request is REJECTED or CANCELLED (while pending):
+   * pending -= days; remaining recalculated; pending must not go negative.
+   */
+  private async releasePending(
+    employeeId: Types.ObjectId,
+    leaveTypeId: Types.ObjectId,
+    days: number,
+  ) {
+    const ent = await this.getEntitlementOrThrow(employeeId, leaveTypeId);
+
+    if (ent.pending < days) {
+      // This indicates data inconsistency; better to fail loudly
+      throw new BadRequestException('Pending balance is inconsistent');
+    }
+
+    ent.pending -= days;
+    this.recomputeRemaining(ent);
+
+    if (ent.remaining < 0) {
+      throw new BadRequestException('Insufficient leave balance');
+    }
+
+    await ent.save();
+  }
+
+  /**
+   * Consume pending into taken when request is APPROVED:
+   * pending -= days; taken += days; remaining recalculated; must not be negative.
+   */
+  private async consumePendingToTaken(
+    employeeId: Types.ObjectId,
+    leaveTypeId: Types.ObjectId,
+    days: number,
+  ) {
+    const ent = await this.getEntitlementOrThrow(employeeId, leaveTypeId);
+
+    if (ent.pending < days) {
+      throw new BadRequestException('Insufficient pending leave balance');
+    }
+
+    ent.pending -= days;
+    ent.taken += days;
+    this.recomputeRemaining(ent);
+
+    if (ent.remaining < 0) {
+      throw new BadRequestException('Insufficient leave balance after approval');
+    }
+
+    await ent.save();
+  }
+
+  /**
+   * If you allow cancelling an already APPROVED request, you must revert taken.
+   */
+  private async revertTaken(
+    employeeId: Types.ObjectId,
+    leaveTypeId: Types.ObjectId,
+    days: number,
+  ) {
+    const ent = await this.getEntitlementOrThrow(employeeId, leaveTypeId);
+
+    if (ent.taken < days) {
+      throw new BadRequestException('Taken balance is inconsistent');
+    }
+
+    ent.taken -= days;
+    this.recomputeRemaining(ent);
+
+    if (ent.remaining < 0) {
+      throw new BadRequestException('Insufficient leave balance');
+    }
+
+    await ent.save();
+  }
+
+  // ============================================================
+  // REQUIREMENT 4: DIRECT MANAGER TEAM VIEW
+  // ============================================================
+
+  /**
+   ** Requirement #4:
+   *  here we allow viewing Team Members’ Leave Balances and Upcoming Leaves
+   * Role: Direct Manager (Department Head)
+ * Direct Manager views team leave balances + upcoming approved leaves.
+ *
+ * IMPORTANT:
+ * - JWT gives us manager """"EMPLOYEE"" id
+ * - But team relation uses supervisorPositionId (a POSITION id)
+ * - So we convert: managerEmployeeId -> manager.primaryPositionId -> team
+ */
+/**
+ * managerEmployeeId comes from JWT (req.user.id)
+ */
+async getTeamLeaves(managerEmployeeId: string): Promise<TeamLeaveSummary[]> {
+  // ✅ get team by manager EMPLOYEE id -> internally mapped to manager POSITION id
+  const team =
+    await this.employeeProfileService.getTeamSummaryForManagerEmployeeId( //guys here we use this helper function made in employee-prof service
+      managerEmployeeId,
+    );
+
+  const summaries: TeamLeaveSummary[] = [];
+
+  for (const member of team) {
+    const entitlements = await this.entitlementModel
+      .find({ employeeId: member._id })
+      .populate('leaveTypeId')
+      .exec();
+
+    const upcomingRequests = await this.requestModel
+      .find({
+        employeeId: member._id,
+        status: LeaveStatus.APPROVED,
+        'dates.to': { $gte: new Date() },
+      })
+      .sort({ 'dates.from': 1 })
+      .exec();
+
+    summaries.push({
+      employee: member as any,
+      entitlements,
+      upcomingRequests,
+    });
+  }
+
+  return summaries;
+}
+
+
+
+
+
+
+
+
+
+
+  // ============================================================
+  // LEAVE CATEGORY
+  // ============================================================
   leaveCategory = {
-  create: async (dto) => {
-    return new this.leaveCategoryModel(dto).save();
-  },
+    create: async (dto) => {
+      return new this.leaveCategoryModel(dto).save();
+    },
 
-  findAll: async () => this.leaveCategoryModel.find().exec(),
+    findAll: async () => this.leaveCategoryModel.find().exec(),
 
-  update: async (id, dto) => {
-    return this.leaveCategoryModel.findByIdAndUpdate(id, dto, { new: true }).exec();
-  },
+    update: async (id, dto) => {
+      return this.leaveCategoryModel
+        .findByIdAndUpdate(id, dto, { new: true })
+        .exec();
+    },
 
-  remove: async (id) => {
-    return this.leaveCategoryModel.findByIdAndDelete(id).exec();
-  },
-};
-
+    remove: async (id) => {
+      return this.leaveCategoryModel.findByIdAndDelete(id).exec();
+    },
+  };
 
   // ============================================================
   // LEAVE TYPE
@@ -89,7 +297,10 @@ export class LeavesService {
   leaveType = {
     create: async (dto: CreateLeaveTypeDto) => {
       const exists = await this.leaveTypeModel.findOne({ code: dto.code }).exec();
-      if (exists) throw new ConflictException(`Leave type with code '${dto.code}' already exists`);
+      if (exists)
+        throw new ConflictException(
+          `Leave type with code '${dto.code}' already exists`,
+        );
       return new this.leaveTypeModel(dto).save();
     },
 
@@ -105,7 +316,8 @@ export class LeavesService {
 
     findByCode: async (code: string) => {
       const doc = await this.leaveTypeModel.findOne({ code }).exec();
-      if (!doc) throw new NotFoundException(`Leave type with code '${code}' not found`);
+      if (!doc)
+        throw new NotFoundException(`Leave type with code '${code}' not found`);
       return doc;
     },
 
@@ -115,22 +327,28 @@ export class LeavesService {
           .findOne({ code: (dto as any).code, _id: { $ne: id } })
           .exec();
         if (exists)
-          throw new ConflictException(`Leave type with code '${(dto as any).code}' already exists`);
+          throw new ConflictException(
+            `Leave type with code '${(dto as any).code}' already exists`,
+          );
       }
 
-      const updated = await this.leaveTypeModel.findByIdAndUpdate(id, dto, { new: true }).exec();
-      if (!updated) throw new NotFoundException(`Leave type with ID '${id}' not found`);
+      const updated = await this.leaveTypeModel
+        .findByIdAndUpdate(id, dto, { new: true })
+        .exec();
+      if (!updated)
+        throw new NotFoundException(`Leave type with ID '${id}' not found`);
       return updated;
     },
 
     remove: async (id: string) => {
       const result = await this.leaveTypeModel.findByIdAndDelete(id).exec();
-      if (!result) throw new NotFoundException(`Leave type with ID '${id}' not found`);
+      if (!result)
+        throw new NotFoundException(`Leave type with ID '${id}' not found`);
     },
   };
 
   // ============================================================
-  // LEAVE POLICY
+  // REQUIREMENT 1: POLICY EXPIRY RULE CHECK (HR Admin)
   // ============================================================
   leavePolicy = {
     create: async (dto: CreatePolicyDto) => {
@@ -167,7 +385,9 @@ export class LeavesService {
     },
 
     update: async (id: string, dto: UpdatePolicyDto) => {
-      const updated = await this.leavePolicyModel.findByIdAndUpdate(id, dto, { new: true }).exec();
+      const updated = await this.leavePolicyModel
+        .findByIdAndUpdate(id, dto, { new: true })
+        .exec();
       if (!updated) throw new NotFoundException(`Policy with ID '${id}' not found`);
       return updated;
     },
@@ -176,10 +396,47 @@ export class LeavesService {
       const deleted = await this.leavePolicyModel.findByIdAndDelete(id).exec();
       if (!deleted) throw new NotFoundException(`Policy with ID '${id}' not found`);
     },
+
+    /**
+     * Check expiry rules for policies and auto-deactivate expired policies.
+     * A policy expires when (effectiveFrom OR createdAt) + expiryAfterMonths <= now.
+     */
+    checkExpiryRules: async () => {
+      const now = new Date();
+      const candidates = await this.leavePolicyModel
+        .find({ expiryAfterMonths: { $ne: null } })
+        .exec();
+
+      let updated = 0;
+
+      for (const policy of candidates) {
+        const months = policy.expiryAfterMonths;
+
+        if (!months || months <= 0) continue;
+
+        const baseDate = policy.effectiveFrom ?? policy.createdAt;
+        if (!baseDate) continue;
+
+        const expiryDate = new Date(baseDate);
+        expiryDate.setMonth(expiryDate.getMonth() + months);
+
+        if (expiryDate <= now && policy.isActive) {
+          policy.isActive = false;
+          policy.effectiveTo = expiryDate;
+          await policy.save();
+          updated++;
+        }
+      }
+
+      return { updated };
+    },
   };
 
   // ============================================================
-  // LEAVE REQUEST
+  // REQUIREMENTS 2, 3, 5: LEAVE REQUESTS
+  //   - Bulk processing (HR Manager) -> bulkProcess
+  //   - Filter request history (All roles) -> filter
+  //   - Prevent negative leave balance -> create/update/approve/reject/cancel
   // ============================================================
   leaveRequest = {
     create: async (dto: CreateLeaveRequestDto) => {
@@ -190,9 +447,15 @@ export class LeavesService {
 
       const durationDays = (to.getTime() - from.getTime()) / 86400000 + 1;
 
+      const employeeId = new Types.ObjectId(dto.employeeId);
+      const leaveTypeId = new Types.ObjectId(dto.leaveTypeId);
+
+      // Reserve days in pending (prevents negative balance)
+      await this.reservePending(employeeId, leaveTypeId, durationDays);
+
       const doc = new this.requestModel({
-        employeeId: new Types.ObjectId(dto.employeeId),
-        leaveTypeId: new Types.ObjectId(dto.leaveTypeId),
+        employeeId,
+        leaveTypeId,
         dates: { from, to },
         durationDays,
         justification: dto.justification,
@@ -219,34 +482,61 @@ export class LeavesService {
       return doc;
     },
 
+    /**
+     * If you update dates while the request is pending,
+     * adjust pending reservation correctly.
+     */
     update: async (id: string, dto: UpdateLeaveRequestDto) => {
-      const updatePayload: any = {};
+      const doc = await this.requestModel.findById(id).exec();
+      if (!doc) throw new NotFoundException('Leave request not found');
 
-      if ((dto as any).startDate) updatePayload['dates.from'] = new Date((dto as any).startDate);
-      if ((dto as any).endDate) updatePayload['dates.to'] = new Date((dto as any).endDate);
-
-      if ((dto as any).startDate && (dto as any).endDate) {
-        const f = new Date((dto as any).startDate);
-        const t = new Date((dto as any).endDate);
-        if (f > t) throw new BadRequestException('startDate must be <= endDate');
+      if (doc.status !== LeaveStatus.PENDING) {
+        throw new BadRequestException('Only PENDING requests can be updated');
       }
 
-      if ((dto as any).justification) updatePayload.justification = (dto as any).justification;
+      const oldFrom = doc.dates.from;
+      const oldTo = doc.dates.to;
+      const oldDuration = doc.durationDays;
 
-      if ((dto as any).attachmentId)
-        updatePayload.attachmentId = new Types.ObjectId((dto as any).attachmentId);
+      const newFrom = (dto as any).startDate ? new Date((dto as any).startDate) : oldFrom;
+      const newTo = (dto as any).endDate ? new Date((dto as any).endDate) : oldTo;
 
-      const doc = await this.requestModel
-        .findByIdAndUpdate(id, { $set: updatePayload }, { new: true })
-        .exec();
+      if (newFrom > newTo) throw new BadRequestException('startDate must be <= endDate');
 
-      if (!doc) throw new NotFoundException('Leave request not found');
-      return doc;
+      const newDuration = (newTo.getTime() - newFrom.getTime()) / 86400000 + 1;
+      const delta = newDuration - oldDuration;
+
+      // If duration increased, reserve more pending.
+      // If duration decreased, release pending.
+      if (delta > 0) {
+        await this.reservePending(doc.employeeId as any, doc.leaveTypeId as any, delta);
+      } else if (delta < 0) {
+        await this.releasePending(doc.employeeId as any, doc.leaveTypeId as any, Math.abs(delta));
+      }
+
+      doc.dates.from = newFrom;
+      doc.dates.to = newTo;
+      doc.durationDays = newDuration;
+
+      if ((dto as any).justification) doc.justification = (dto as any).justification;
+      if ((dto as any).attachmentId) doc.attachmentId = new Types.ObjectId((dto as any).attachmentId);
+
+      return doc.save();
     },
 
     cancel: async (id: string, requestedById?: string) => {
       const doc = await this.requestModel.findById(id).exec();
       if (!doc) throw new NotFoundException('Leave request not found');
+
+      // If cancelling while pending, release reservation
+      if (doc.status === LeaveStatus.PENDING) {
+        await this.releasePending(doc.employeeId as any, doc.leaveTypeId as any, doc.durationDays);
+      }
+
+      // If cancelling an already approved request (optional behavior), revert taken
+      if (doc.status === LeaveStatus.APPROVED) {
+        await this.revertTaken(doc.employeeId as any, doc.leaveTypeId as any, doc.durationDays);
+      }
 
       doc.status = LeaveStatus.CANCELLED;
       doc.approvalFlow.push({
@@ -260,26 +550,34 @@ export class LeavesService {
     },
 
     managerApprove: async (id: string, managerId: string) => {
-      const doc = await this.requestModel.findById(id).exec();
-      if (!doc) throw new NotFoundException('Leave request not found');
+  const doc = await this.requestModel.findById(id).exec();
+  if (!doc) throw new NotFoundException('Leave request not found');
 
-      if (doc.status !== LeaveStatus.PENDING)
-        throw new BadRequestException('Request is not pending');
+  if (doc.status !== LeaveStatus.PENDING) {
+    throw new BadRequestException('Request is not pending manager approval');
+  }
 
-      doc.status = LeaveStatus.APPROVED;
-      doc.approvalFlow.push({
-        role: 'manager',
-        status: 'approved',
-        decidedBy: new Types.ObjectId(managerId),
-        decidedAt: new Date(),
-      });
+  // ✅ DO NOT consume pending here (HR step does final approval)
+  doc.status = LeaveStatus.MANAGER_APPROVED;
 
-      return doc.save();
-    },
+  doc.approvalFlow.push({
+    role: 'manager',
+    status: 'approved',
+    decidedBy: new Types.ObjectId(managerId),
+    decidedAt: new Date(),
+  });
+
+  return doc.save();
+},
 
     managerReject: async (id: string, managerId: string, reason?: string) => {
       const doc = await this.requestModel.findById(id).exec();
       if (!doc) throw new NotFoundException('Leave request not found');
+
+      // If rejecting while pending, release reservation
+      if (doc.status === LeaveStatus.PENDING) {
+        await this.releasePending(doc.employeeId as any, doc.leaveTypeId as any, doc.durationDays);
+      }
 
       doc.status = LeaveStatus.REJECTED;
       doc.approvalFlow.push({
@@ -290,6 +588,122 @@ export class LeavesService {
       });
 
       return doc.save();
+    },
+
+    //hr
+
+hrApprove: async (id: string, hrId: string) => {
+  const doc = await this.requestModel.findById(id).exec();
+  if (!doc) throw new NotFoundException('Leave request not found');
+
+  if (doc.status !== LeaveStatus.MANAGER_APPROVED) {
+    throw new BadRequestException('Request is not awaiting HR review');
+  }
+
+  // ✅ FINAL approval consumes pending
+  await this.consumePendingToTaken(
+    doc.employeeId as any,
+    doc.leaveTypeId as any,
+    doc.durationDays,
+  );
+
+  doc.status = LeaveStatus.APPROVED;
+  doc.approvalFlow.push({
+    role: 'hr',
+    status: 'approved',
+    decidedBy: new Types.ObjectId(hrId),
+    decidedAt: new Date(),
+  });
+
+  return doc.save();
+},
+
+hrReject: async (id: string, hrId: string, reason?: string) => {
+  const doc = await this.requestModel.findById(id).exec();
+  if (!doc) throw new NotFoundException('Leave request not found');
+
+  if (doc.status !== LeaveStatus.MANAGER_APPROVED) {
+    throw new BadRequestException('Request is not awaiting HR review');
+  }
+
+  // ✅ HR rejection releases pending
+  await this.releasePending(
+    doc.employeeId as any,
+    doc.leaveTypeId as any,
+    doc.durationDays,
+  );
+
+  doc.status = LeaveStatus.REJECTED;
+  doc.approvalFlow.push({
+    role: 'hr',
+    status: reason ?? 'rejected',
+    decidedBy: new Types.ObjectId(hrId),
+    decidedAt: new Date(),
+  });
+
+  return doc.save();
+},
+
+
+    /**
+     * REQUIREMENT 2: BULK REQUEST PROCESSING (HR Manager)
+     */
+
+
+// bulkProcess
+bulkProcess: async (dto: BulkLeaveRequestDto) => {
+  const success: LeaveRequestDocument[] = [];
+  const failed: Array<{ id: string; reason: string }> = [];
+
+  for (const item of dto.requests) {
+    try {
+      const request = await this.requestModel.findById(item.id).exec();
+      if (!request) {
+        failed.push({ id: item.id, reason: 'Request not found' });
+        continue;
+      }
+
+      // ✅ Bulk should operate at HR stage (after manager approval)
+      if (request.status !== LeaveStatus.MANAGER_APPROVED) {
+        failed.push({ id: item.id, reason: 'Request is not awaiting HR review' });
+        continue;
+      }
+
+      if (item.decision === 'APPROVED') {
+        success.push(await this.leaveRequest.hrApprove(item.id, dto.approverId));
+      } else if (item.decision === 'REJECTED') {
+        success.push(await this.leaveRequest.hrReject(item.id, dto.approverId, item.reason));
+      } else {
+        failed.push({ id: item.id, reason: 'Unknown decision' });
+      }
+    } catch (err: any) {
+      failed.push({ id: item.id, reason: err.message || 'Error processing request' });
+    }
+  }
+
+  return { success, failed };
+},
+    
+    
+
+    /**
+     * REQUIREMENT 3: FILTER REQUEST HISTORY (All Roles)
+     * IMPORTANT: Must be arrow function so `this.requestModel` works correctly.
+     */
+    filter: async (params: FilterLeaveRequestsDto) => {
+      const query: any = {};
+
+      if (params.employeeId) query.employeeId = new Types.ObjectId(params.employeeId);
+      if (params.status) query.status = params.status;
+      if (params.leaveTypeId) query.leaveTypeId = new Types.ObjectId(params.leaveTypeId);
+
+      if (params.startDate) query['dates.from'] = { $gte: new Date(params.startDate) };
+      if (params.endDate) {
+        query['dates.to'] = query['dates.to'] ?? {};
+        query['dates.to'].$lte = new Date(params.endDate);
+      }
+
+      return this.requestModel.find(query).sort({ createdAt: -1 }).lean();
     },
   };
 
@@ -316,13 +730,13 @@ export class LeavesService {
         remaining: dto.totalDays + (dto.carriedOverDays || 0),
         accruedActual: 0,
         accruedRounded: 0,
+        year: dto.year,
       });
 
       return doc.save();
     },
 
-    findAll: async () =>
-      this.entitlementModel.find().populate('leaveTypeId').lean(),
+    findAll: async () => this.entitlementModel.find().populate('leaveTypeId').lean(),
 
     findByEmployee: async (employeeId: string) =>
       this.entitlementModel
@@ -342,11 +756,16 @@ export class LeavesService {
       if ((dto as any).usedDays !== undefined) doc.taken = (dto as any).usedDays;
       if ((dto as any).pendingDays !== undefined) doc.pending = (dto as any).pendingDays;
 
-      doc.remaining = doc.yearlyEntitlement + doc.carryForward - doc.taken - doc.pending;
+      this.recomputeRemaining(doc);
+
+      if (doc.remaining < 0) throw new BadRequestException('Insufficient leave balance');
 
       return doc.save();
     },
 
+    /**
+     * Used by LeaveAdjustments; must not allow negative remaining.
+     */
     adjustBalance: async (employeeId: string, leaveTypeId: string, deltaDays: number) => {
       const doc = await this.entitlementModel.findOne({
         employeeId: new Types.ObjectId(employeeId),
@@ -356,16 +775,17 @@ export class LeavesService {
       if (!doc) throw new NotFoundException('Entitlement not found');
 
       doc.taken += deltaDays;
-      doc.remaining = doc.yearlyEntitlement + doc.carryForward - doc.taken - doc.pending;
+      this.recomputeRemaining(doc);
 
-      if (doc.remaining < 0)
-        throw new BadRequestException('Insufficient leave balance');
+      if (doc.remaining < 0) throw new BadRequestException('Insufficient leave balance');
 
       return doc.save();
     },
 
     removeByEmployee: async (employeeId: string) =>
-      this.entitlementModel.deleteMany({ employeeId: new Types.ObjectId(employeeId) }).exec(),
+      this.entitlementModel
+        .deleteMany({ employeeId: new Types.ObjectId(employeeId) })
+        .exec(),
   };
 
   // ============================================================
@@ -397,8 +817,7 @@ export class LeavesService {
       const doc = await this.adjustmentModel.findById(id).exec();
       if (!doc) throw new NotFoundException('Adjustment not found');
 
-      const delta =
-        doc.adjustmentType === AdjustmentType.ADD ? doc.amount : -doc.amount;
+      const delta = doc.adjustmentType === AdjustmentType.ADD ? doc.amount : -doc.amount;
 
       await this.leaveEntitlement.adjustBalance(
         doc.employeeId.toString(),
@@ -417,7 +836,8 @@ export class LeavesService {
   calendar = {
     create: async (dto: CreateCalendarDto) => {
       const exists = await this.calendarModel.findOne({ year: dto.year }).exec();
-      if (exists) throw new ConflictException(`Calendar for year ${dto.year} already exists`);
+      if (exists)
+        throw new ConflictException(`Calendar for year ${dto.year} already exists`);
       return new this.calendarModel(dto).save();
     },
 
@@ -430,7 +850,9 @@ export class LeavesService {
     },
 
     update: async (year: number, dto: UpdateCalendarDto) => {
-      const doc = await this.calendarModel.findOneAndUpdate({ year }, dto, { new: true }).exec();
+      const doc = await this.calendarModel
+        .findOneAndUpdate({ year }, dto, { new: true })
+        .exec();
       if (!doc) throw new NotFoundException(`Calendar for year ${year} not found`);
       return doc;
     },
@@ -447,8 +869,7 @@ export class LeavesService {
       const start = new Date(dto.startDate);
       const end = new Date(dto.endDate);
 
-      if (start > end)
-        throw new BadRequestException('Start date must be before end date');
+      if (start > end) throw new BadRequestException('Start date must be before end date');
 
       cal.blockedPeriods.push({
         from: start,
