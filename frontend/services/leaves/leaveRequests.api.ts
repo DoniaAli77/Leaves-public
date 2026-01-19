@@ -23,3 +23,20 @@ export const rejectLeaveRequest = (
     approverId,
     comment,
   });
+
+ 
+// BULK PROCESSING (HR Manager)
+//.............................
+export interface BulkLeaveRequest {
+  id: string;
+  decision: "APPROVED" | "REJECTED";
+  reason?: string;
+}
+
+export interface BulkLeaveRequestDto {
+  approverId: string;
+  requests: BulkLeaveRequest[];
+}
+
+export const bulkProcessLeaveRequests = (dto: BulkLeaveRequestDto) =>
+  axiosInstance.put("/leave-request/bulk", dto);

@@ -596,27 +596,85 @@ async getTeamLeaves(managerEmployeeId: string): Promise<TeamLeaveSummary[]> {
 
     /**
      * REQUIREMENT 2: BULK REQUEST PROCESSING (HR Manager)
-     * IMPORTANT: Must be arrow function so `this.requestModel` works correctly.
      */
-    bulkProcess: async (dto: BulkLeaveRequestDto) => {
-      const results: LeaveRequestDocument[] = [];
+hrApprove: async (id: string, hrId: string) => {
+  const doc = await this.requestModel.findById(id).exec();
+  if (!doc) throw new NotFoundException('Leave request not found');
+  if (doc.status !== LeaveStatus.PENDING) {
+    throw new BadRequestException('Request is not pending');
+  }
+  await this.consumePendingToTaken(
+    doc.employeeId as any,
+    doc.leaveTypeId as any,
+    doc.durationDays,
+  );
+  doc.status = LeaveStatus.APPROVED;
+  doc.approvalFlow.push({
+    role: 'hr',
+    status: 'approved',
+    decidedBy: new Types.ObjectId(hrId),
+    decidedAt: new Date(),
+  });
+  return doc.save();
+},
 
-      for (const item of dto.requests) {
-        if (item.decision === 'APPROVED') {
-          const res = await this.leaveRequest.managerApprove(item.id, dto.approverId);
-          results.push(res);
-        } else if (item.decision === 'REJECTED') {
-          const res = await this.leaveRequest.managerReject(
-            item.id,
-            dto.approverId,
-            item.reason,
-          );
-          results.push(res);
-        }
+hrReject: async (id: string, hrId: string, reason?: string) => {
+  const doc = await this.requestModel.findById(id).exec();
+  if (!doc) throw new NotFoundException('Leave request not found');
+  if (doc.status === LeaveStatus.PENDING) {
+    await this.releasePending(
+      doc.employeeId as any,
+      doc.leaveTypeId as any,
+      doc.durationDays,
+    );
+  }
+  doc.status = LeaveStatus.REJECTED;
+  doc.approvalFlow.push({
+    role: 'hr',
+    status: reason ?? 'rejected',
+    decidedBy: new Types.ObjectId(hrId),
+    decidedAt: new Date(),
+  });
+  return doc.save();
+},
+
+// bulkProcess
+bulkProcess: async (dto: BulkLeaveRequestDto) => {
+  const success: LeaveRequestDocument[] = [];
+  const failed: Array<{ id: string; reason: string }> = [];
+  for (const item of dto.requests) {
+    try {
+      const request = await this.requestModel.findById(item.id).exec();
+      if (!request) {
+        failed.push({ id: item.id, reason: 'Request not found' });
+        continue;
       }
+      if (request.status !== LeaveStatus.PENDING) {
+        failed.push({ id: item.id, reason: 'Request is not pending' });
+        continue;
+      }
+      if (item.decision === 'APPROVED') {
+        const res = await this.leaveRequest.hrApprove(item.id, dto.approverId);
+        success.push(res);
+      } else if (item.decision === 'REJECTED') {
+        const res = await this.leaveRequest.hrReject(
+          item.id,
+          dto.approverId,
+          item.reason,
+        );
+        success.push(res);
+      } else {
+        failed.push({ id: item.id, reason: 'Unknown decision' });
+      }
+    } catch (err: any) {
+      failed.push({ id: item.id, reason: err.message || 'Error processing request' });
+    }
+  }
+  return { success, failed };
+},
 
-      return results;
-    },
+    
+    
 
     /**
      * REQUIREMENT 3: FILTER REQUEST HISTORY (All Roles)

@@ -50,7 +50,7 @@ import { ADMIN_ROLES } from '../common/constants/role-groups';
 import { SystemRole } from '../employee-profile/enums/employee-profile.enums';
 
 @Controller()
-@UseGuards(JwtAuthGuard, RolesGuard) // ✅ applies JWT + role checking to ALL endpoints
+//@UseGuards(JwtAuthGuard, RolesGuard) // ✅ applies JWT + role checking to ALL endpoints
 export class LeavesController {
   constructor(private readonly service: LeavesService) {}
 
@@ -94,6 +94,7 @@ export class LeavesController {
   // LEAVE POLICY
   // ===================================================
   @Post('leave-policy')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(...ADMIN_ROLES)
   @UsePipes(new ValidationPipe({ whitelist: true }))
   createPolicy(@Body() dto: CreatePolicyDto) {
@@ -111,6 +112,7 @@ export class LeavesController {
   }
 
   @Patch('leave-policy/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(...ADMIN_ROLES)
   @UsePipes(new ValidationPipe({ whitelist: true }))
   updatePolicy(@Param('id') id: string, @Body() dto: UpdatePolicyDto) {
@@ -118,6 +120,7 @@ export class LeavesController {
   }
 
   @Delete('leave-policy/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(...ADMIN_ROLES)
   @HttpCode(HttpStatus.NO_CONTENT)
   removePolicy(@Param('id') id: string) {
@@ -128,6 +131,7 @@ export class LeavesController {
   // ✅ REQUIREMENT 1: POLICY EXPIRY CHECK (HR Admin)
   // ===================================================
   @Patch('leave-policy/check-expiry')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(...ADMIN_ROLES)
   checkPolicyExpiry() {
     return this.service.leavePolicy.checkExpiryRules();
@@ -185,6 +189,7 @@ export class LeavesController {
   }
 
   @Put('leave-request/:id/approve/manager')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(SystemRole.DEPARTMENT_HEAD) // direct manager
   @UsePipes(new ValidationPipe({ whitelist: true }))
   approveReq(@Param('id') id: string, @Body() dto: ApproveRequestDto) {
@@ -192,6 +197,7 @@ export class LeavesController {
   }
 
   @Put('leave-request/:id/reject/manager')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(SystemRole.DEPARTMENT_HEAD) // direct manager
   @UsePipes(new ValidationPipe({ whitelist: true }))
   rejectReq(@Param('id') id: string, @Body() dto: ApproveRequestDto) {
@@ -202,6 +208,7 @@ export class LeavesController {
   // ✅ REQUIREMENT 2: BULK REQUEST PROCESSING (HR Manager)
   // ===================================================
   @Put('leave-request/bulk')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(SystemRole.HR_MANAGER)
   @UsePipes(new ValidationPipe({ whitelist: true }))
   bulkProcess(@Body() dto: BulkLeaveRequestDto) {
@@ -223,6 +230,7 @@ export class LeavesController {
      import { Request } from 'express'; */
 
   @Get('manager/team-leaves')
+  @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(SystemRole.DEPARTMENT_HEAD)
 getMyTeamLeaves(@Req() req: Request) {
   const managerEmployeeId = (req as any).user.id;
@@ -266,6 +274,7 @@ getMyTeamLeaves(@Req() req: Request) {
   }
 
   @Put('leave-adjustment/:id/approve')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(SystemRole.HR_MANAGER)
   @UsePipes(new ValidationPipe({ whitelist: true }))
   approveAdjustment(@Param('id') id: string, @Body() dto: ApproveAdjustmentDto) {
@@ -276,6 +285,7 @@ getMyTeamLeaves(@Req() req: Request) {
   // CALENDAR
   // ===================================================
   @Post('calendar')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(...ADMIN_ROLES)
   @UsePipes(new ValidationPipe({ whitelist: true }))
   createCalendar(@Body() dto: CreateCalendarDto) {
@@ -288,6 +298,7 @@ getMyTeamLeaves(@Req() req: Request) {
   }
 
   @Patch('calendar/:year')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(...ADMIN_ROLES)
   @UsePipes(new ValidationPipe({ whitelist: true }))
   updateCalendar(
@@ -298,6 +309,7 @@ getMyTeamLeaves(@Req() req: Request) {
   }
 
   @Post('calendar/:year/blocked-period')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(...ADMIN_ROLES)
   @UsePipes(new ValidationPipe({ whitelist: true }))
   addBlocked(
@@ -308,6 +320,7 @@ getMyTeamLeaves(@Req() req: Request) {
   }
 
   @Delete('calendar/:year/blocked-period/:index')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(...ADMIN_ROLES)
   @HttpCode(HttpStatus.NO_CONTENT)
   removeBlockedPeriod(

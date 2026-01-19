@@ -1688,86 +1688,120 @@ export default function Dashboard() {
         )}
 
         {/* ===== HR MANAGER ===== */}
-        {/* HR Manager Dashboard - Only accessible to HR_MANAGER role */}
-        {/* HR Manager CANNOT access: Access Control, System Governance, Role Assignment */}
-        {role === "HR_MANAGER" && (
-          <div className="lg:col-span-3">
-            {/* 1. HR MANAGER HEADER */}
-            <div className="glass-card p-5 mb-4">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <h1 className="text-xl font-bold text-white mb-0.5">HR Management Dashboard</h1>
-                  <p className="text-xs text-white/60">Employee Operations & Approvals</p>
-                </div>
-                <div className="ml-4 flex-shrink-0">
-                  <div className="px-3 py-1.5 rounded bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-400/30">
-                    <span className="text-xs font-bold text-blue-300 uppercase tracking-wider">HR MANAGER</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+{/* HR Manager Dashboard - Only accessible to HR_MANAGER role */}
+{/* HR Manager CANNOT access: Access Control, System Governance, Role Assignment */}
+{role === "HR_MANAGER" && (
+  <div className="lg:col-span-3">
+    {/* 1. HR MANAGER HEADER */}
+    <div className="glass-card p-5 mb-4">
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <h1 className="text-xl font-bold text-white mb-0.5">
+            HR Management Dashboard
+          </h1>
+          <p className="text-xs text-white/60">Employee Operations & Approvals</p>
+        </div>
 
-            {/* 2. HR OVERVIEW - PRIMARY VISIBLE SECTION */}
-            <div className="glass-card p-4 mb-4">
-              <h2 className="text-sm font-semibold text-white mb-3">At a Glance</h2>
-              {hrData.loading ? (
-                <div className="text-center py-3 text-white/60 text-xs">Loading...</div>
-              ) : hrData.error ? (
-                <div className="text-center py-3 text-red-400 text-xs">{hrData.error}</div>
-              ) : (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-            <button
-                    onClick={() => {
-                      setHrSections(prev => ({ ...prev, employees: true }));
-                      setTimeout(() => {
-                        document.getElementById('hr-employees-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                      }, 100);
-                    }}
-                    className="bg-white/5 rounded-lg p-2.5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer text-left"
-                  >
-                    <div className="text-xs text-white/60 mb-0.5 uppercase tracking-wide">Total Employees</div>
-                    <div className="text-lg font-bold text-white">{hrData.totalEmployees}</div>
-      </button>
-                  <button
-                    onClick={() => {
-                      setHrSections(prev => ({ ...prev, employees: true }));
-                      setTimeout(() => {
-                        document.getElementById('hr-employees-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                      }, 100);
-                    }}
-                    className="bg-white/5 rounded-lg p-2.5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer text-left"
-                  >
-                    <div className="text-xs text-white/60 mb-0.5 uppercase tracking-wide">Active</div>
-                    <div className="text-lg font-bold text-green-400">{hrData.activeEmployees}</div>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setHrSections(prev => ({ ...prev, changeRequests: true }));
-                      setTimeout(() => {
-                        document.getElementById('hr-requests-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                      }, 100);
-                    }}
-                    className="bg-white/5 rounded-lg p-2.5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer text-left"
-                  >
-                    <div className="text-xs text-white/60 mb-0.5 uppercase tracking-wide">Pending Requests</div>
-                    <div className="text-lg font-bold text-yellow-400">{hrData.pendingRequests}</div>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setHrSections(prev => ({ ...prev, changeRequests: true }));
-                      setTimeout(() => {
-                        document.getElementById('hr-requests-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                      }, 100);
-                    }}
-                    className="bg-white/5 rounded-lg p-2.5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer text-left"
-                  >
-                    <div className="text-xs text-white/60 mb-0.5 uppercase tracking-wide">Disputes</div>
-                    <div className="text-lg font-bold text-orange-400">{hrData.disputes}</div>
-            </button>
+        {/* ✅ UPDATED RIGHT SIDE: button + badge */}
+        <div className="ml-4 flex items-center gap-2 flex-shrink-0">
+          <button
+            onClick={() => router.push("/subsystems/leaves/requests")}
+            className="px-3 py-1.5 text-xs text-white font-medium rounded bg-cyan-600 hover:bg-cyan-500 transition-colors"
+          >
+            Leave Requests
+          </button>
+
+          <div className="px-3 py-1.5 rounded bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-400/30">
+            <span className="text-xs font-bold text-blue-300 uppercase tracking-wider">
+              HR MANAGER
+            </span>
           </div>
-        )}
+        </div>
+      </div>
+    </div>
+
+    {/* 2. HR OVERVIEW - PRIMARY VISIBLE SECTION */}
+    <div className="glass-card p-4 mb-4">
+      <h2 className="text-sm font-semibold text-white mb-3">At a Glance</h2>
+
+      {hrData.loading ? (
+        <div className="text-center py-3 text-white/60 text-xs">Loading...</div>
+      ) : hrData.error ? (
+        <div className="text-center py-3 text-red-400 text-xs">{hrData.error}</div>
+      ) : (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+          <button
+            onClick={() => {
+              setHrSections((prev) => ({ ...prev, employees: true }));
+              setTimeout(() => {
+                document
+                  .getElementById("hr-employees-section")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }, 100);
+            }}
+            className="bg-white/5 rounded-lg p-2.5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer text-left"
+          >
+            <div className="text-xs text-white/60 mb-0.5 uppercase tracking-wide">
+              Total Employees
             </div>
-hr
+            <div className="text-lg font-bold text-white">{hrData.totalEmployees}</div>
+          </button>
+
+          <button
+            onClick={() => {
+              setHrSections((prev) => ({ ...prev, employees: true }));
+              setTimeout(() => {
+                document
+                  .getElementById("hr-employees-section")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }, 100);
+            }}
+            className="bg-white/5 rounded-lg p-2.5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer text-left"
+          >
+            <div className="text-xs text-white/60 mb-0.5 uppercase tracking-wide">
+              Active
+            </div>
+            <div className="text-lg font-bold text-green-400">{hrData.activeEmployees}</div>
+          </button>
+
+          <button
+            onClick={() => {
+              setHrSections((prev) => ({ ...prev, changeRequests: true }));
+              setTimeout(() => {
+                document
+                  .getElementById("hr-requests-section")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }, 100);
+            }}
+            className="bg-white/5 rounded-lg p-2.5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer text-left"
+          >
+            <div className="text-xs text-white/60 mb-0.5 uppercase tracking-wide">
+              Pending Requests
+            </div>
+            <div className="text-lg font-bold text-yellow-400">{hrData.pendingRequests}</div>
+          </button>
+
+          <button
+            onClick={() => {
+              setHrSections((prev) => ({ ...prev, changeRequests: true }));
+              setTimeout(() => {
+                document
+                  .getElementById("hr-requests-section")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }, 100);
+            }}
+            className="bg-white/5 rounded-lg p-2.5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer text-left"
+          >
+            <div className="text-xs text-white/60 mb-0.5 uppercase tracking-wide">
+              Disputes
+            </div>
+            <div className="text-lg font-bold text-orange-400">{hrData.disputes}</div>
+          </button>
+        </div>
+      )}
+    </div>
+
+    
             {/* 3. EMPLOYEE MANAGEMENT */}
             <div id="hr-employees-section" className="glass-card p-4 mb-3">
               <div className="flex items-center justify-between mb-2">

@@ -1,6 +1,6 @@
  import React, { useState } from "react";
 import { useRouter } from "next/router";
-import api from "../api/axios";
+import axiosInstance from "@/utils/axiosInstance";
 
 type HRRole = "HR_ADMIN" | "HR_MANAGER" | "HR_EMPLOYEE" | "";
 
@@ -59,7 +59,7 @@ export default function RegisterPage() {
     try {
       setLoading(true);
 
-      await api.post("/auth/register", {
+      await axiosInstance.post("/auth/register", {
         employeeNumber: form.employeeNumber,
         password: form.password,
         firstName: form.firstName,

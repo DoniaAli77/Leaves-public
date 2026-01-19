@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import api from "../api/axios";
+import axiosInstance from "@/utils/axiosInstance";
 
 export default function LoginPage() {
   const [employeeNumber, setEmployeeNumber] = useState("");
@@ -11,9 +11,9 @@ export default function LoginPage() {
   setMsg("");
 
   try {
-    const res = await api.post("/auth/login", {
-      employeeNumber,
-      password,
+    const res = await axiosInstance.post("/auth/login", {
+  employeeNumber,
+  password,
     });
 
     const { access_token, payload, isAdmin } = res.data;
