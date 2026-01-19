@@ -2,6 +2,27 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import api from "../api/axios";
 
+
+const normalizeRole = (r?: string | null) =>
+  (r ?? "")
+    .trim()
+    .toUpperCase()
+    // turns "Legal & Policy Admin" -> "LEGAL_POLICY_ADMIN"
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+const HR_DASHBOARD_ROLES = new Set(["HR_MANAGER", "HR_EMPLOYEE", "HR_ADMIN"]);
+
+// based on our backend role-groups.ts ADMIN_ROLES (+ PAYROLL_MANAGER is in our enum)
+const ADMIN_DASHBOARD_ROLES = new Set([
+  "SYSTEM_ADMIN",
+  "LEGAL_POLICY_ADMIN",
+  "PAYROLL_SPECIALIST",
+  "PAYROLL_MANAGER",
+  "FINANCE_STAFF",
+]);
+
+
 export default function Dashboard() {
   const router = useRouter();
 
@@ -144,35 +165,40 @@ export default function Dashboard() {
   const [changeRequestSuccess, setChangeRequestSuccess] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const savedUser = localStorage.getItem("username");
-    const savedRole = localStorage.getItem("role");
+  const token = localStorage.getItem("token");
+  const savedUser = localStorage.getItem("username");
+  const savedRole = localStorage.getItem("role");
 
-    if (!token) {
-      router.push("/login");
-      return;
-    }
+  if (!token) {
+    router.push("/login");
+    return;
+  }
 
-    const normalizedRole = (savedRole || "")
-      .toUpperCase()
-      .replaceAll(" ", "_");
+  const normalizedRole = (savedRole || "")
+    .toUpperCase()
+    .replaceAll(" ", "_");
 
-    setUsername(savedUser || "Unknown User");
-    setRole(normalizedRole);
-    setLoading(false);
+  setUsername(savedUser || "Unknown User");
+  setRole(normalizedRole);
+  setLoading(false);
 
-    // Load dashboard widgets
-    if (normalizedRole === "SYSTEM_ADMIN") {
-      loadAdminDashboardData(token);
-    } else if (normalizedRole === "HR_MANAGER") {
-      loadHRManagerData(token);
-    } else if (normalizedRole === "DEPARTMENT_HEAD") {
-      loadManagerDashboardData(token);
-    } else if (normalizedRole === "DEPARTMENT_EMPLOYEE") {
-      loadEmployeeDashboardData(token);
-    } else {
-      setWidgetsLoading(false);
-    }
+
+  //Load dashboard widgets
+  if (normalizedRole === "SYSTEM_ADMIN") {
+    loadAdminDashboardData(token);
+  } else if (normalizedRole === "HR_MANAGER") {
+    loadHRManagerData(token);
+  } else if (normalizedRole === "DEPARTMENT_HEAD") {
+    loadManagerDashboardData(token);
+  } else if (normalizedRole === "DEPARTMENT_EMPLOYEE") {
+    loadEmployeeDashboardData(token);
+  } else if (normalizedRole === "HR_ADMIN") {
+    // HR Admin has a separate panel (policy/expiry/compliance). No HR manager widgets.
+    setWidgetsLoading(false);
+  } else {
+    setWidgetsLoading(false);
+  }
+    
   }, [router]);
 
   async function loadDashboardWidgets(token: string) {
@@ -1687,22 +1713,98 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ===== HR MANAGER ===== */}
-{/* HR Manager Dashboard - Only accessible to HR_MANAGER role */}
-{/* HR Manager CANNOT access: Access Control, System Governance, Role Assignment */}
+
+
+
+
+{/* ===== HR ADMIN ===== */}
+{role === "HR_ADMIN" && (
+  <div className="lg:col-span-3">
+    <div className="glass-card p-6">
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h2 className="text-xl font-semibold text-white">HR Admin Panel</h2>
+          <p className="text-xs text-white/60">
+            Leave policy configuration + expiry enforcement + compliance review
+          </p>
+        </div>
+
+        <div className="px-3 py-1.5 rounded bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-400/30">
+          <span className="text-xs font-bold text-blue-300 uppercase tracking-wider">
+            HR ADMIN
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <button
+          onClick={() => router.push("/subsystems/leaves/policies")}
+          className="glass-btn h-24 flex flex-col items-center justify-center gap-2 hover:bg-white/12 transition-all"
+        >
+          <span className="text-2xl">📜</span>
+          <span className="text-sm font-medium">Policies</span>
+        </button>
+
+        <button
+          onClick={() => router.push("/subsystems/leaves/entitlements")}
+          className="glass-btn h-24 flex flex-col items-center justify-center gap-2 hover:bg-white/12 transition-all"
+        >
+          <span className="text-2xl">🎁</span>
+          <span className="text-sm font-medium">Entitlements</span>
+        </button>
+
+        <button
+          onClick={() => router.push("/subsystems/leaves/calendar")}
+          className="glass-btn h-24 flex flex-col items-center justify-center gap-2 hover:bg-white/12 transition-all"
+        >
+          <span className="text-2xl">📅</span>
+          <span className="text-sm font-medium">Calendars</span>
+        </button>
+
+        <button
+          onClick={() => router.push("/subsystems/leaves/requests")}
+          className="glow-btn h-24 flex flex-col items-center justify-center gap-2 transition-all"
+        >
+          <span className="text-2xl">✅</span>
+          <span className="text-sm font-medium">Compliance Review</span>
+        </button>
+      </div>
+
+      <div className="mt-4 text-xs text-white/50 space-y-1">
+        <p>
+          • HR Admin does compliance review after manager approval (REQ-025).
+        </p>
+        <p>
+          • Expiry policies are enforced in year-end processing (REQ-041).
+        </p>
+      </div>
+    </div>
+  </div>
+)}
+
+
+
+
+
+
+
+
+{/* ===== HR MANAGER ===== */}
 {role === "HR_MANAGER" && (
   <div className="lg:col-span-3">
-    {/* 1. HR MANAGER HEADER */}
+    {/* 1. HR HEADER */}
     <div className="glass-card p-5 mb-4">
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <h1 className="text-xl font-bold text-white mb-0.5">
             HR Management Dashboard
           </h1>
-          <p className="text-xs text-white/60">Employee Operations & Approvals</p>
+          <p className="text-xs text-white/60">
+            Employee Operations & Approvals
+          </p>
         </div>
 
-        {/* ✅ UPDATED RIGHT SIDE: button + badge */}
+        {/* button + badge */}
         <div className="ml-4 flex items-center gap-2 flex-shrink-0">
           <button
             onClick={() => router.push("/subsystems/leaves/requests")}
