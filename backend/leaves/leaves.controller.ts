@@ -95,7 +95,7 @@ export class LeavesController {
   // ===================================================
   @Post('leave-policy')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(...ADMIN_ROLES)
+  @Roles(SystemRole.HR_ADMIN, SystemRole.SYSTEM_ADMIN)
   @UsePipes(new ValidationPipe({ whitelist: true }))
   createPolicy(@Body() dto: CreatePolicyDto) {
     return this.service.leavePolicy.create(dto);
@@ -111,9 +111,19 @@ export class LeavesController {
     return this.service.leavePolicy.findOne(id);
   }
 
+  // ===================================================
+  // ✅ REQUIREMENT 1: POLICY EXPIRY CHECK (HR Admin)
+  // ===================================================
+  @Patch('leave-policy/check-expiry')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(SystemRole.HR_ADMIN, SystemRole.SYSTEM_ADMIN)
+  checkPolicyExpiry() {
+    return this.service.leavePolicy.checkExpiryRules();
+  }
+
   @Patch('leave-policy/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(...ADMIN_ROLES)
+  @Roles(SystemRole.HR_ADMIN, SystemRole.SYSTEM_ADMIN)
   @UsePipes(new ValidationPipe({ whitelist: true }))
   updatePolicy(@Param('id') id: string, @Body() dto: UpdatePolicyDto) {
     return this.service.leavePolicy.update(id, dto);
@@ -127,15 +137,7 @@ export class LeavesController {
     return this.service.leavePolicy.remove(id);
   }
 
-  // ===================================================
-  // ✅ REQUIREMENT 1: POLICY EXPIRY CHECK (HR Admin)
-  // ===================================================
-  @Patch('leave-policy/check-expiry')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(...ADMIN_ROLES)
-  checkPolicyExpiry() {
-    return this.service.leavePolicy.checkExpiryRules();
-  }
+  
 
   // ===================================================
   // LEAVE CATEGORY
@@ -219,6 +221,7 @@ export class LeavesController {
   // ✅ REQUIREMENT 3: FILTER REQUEST HISTORY (All Roles)
   // ===================================================
   @Get('leave-request/history')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   filterHistory(@Query() params: FilterLeaveRequestsDto) {
     return this.service.leaveRequest.filter(params);
   }

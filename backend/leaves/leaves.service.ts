@@ -550,29 +550,25 @@ async getTeamLeaves(managerEmployeeId: string): Promise<TeamLeaveSummary[]> {
     },
 
     managerApprove: async (id: string, managerId: string) => {
-      const doc = await this.requestModel.findById(id).exec();
-      if (!doc) throw new NotFoundException('Leave request not found');
+  const doc = await this.requestModel.findById(id).exec();
+  if (!doc) throw new NotFoundException('Leave request not found');
 
-      if (doc.status !== LeaveStatus.PENDING)
-        throw new BadRequestException('Request is not pending');
+  if (doc.status !== LeaveStatus.PENDING) {
+    throw new BadRequestException('Request is not pending manager approval');
+  }
 
-      // Consume pending into taken (prevents negative balance)
-      await this.consumePendingToTaken(
-        doc.employeeId as any,
-        doc.leaveTypeId as any,
-        doc.durationDays,
-      );
+  // ✅ DO NOT consume pending here (HR step does final approval)
+  doc.status = LeaveStatus.MANAGER_APPROVED;
 
-      doc.status = LeaveStatus.APPROVED;
-      doc.approvalFlow.push({
-        role: 'manager',
-        status: 'approved',
-        decidedBy: new Types.ObjectId(managerId),
-        decidedAt: new Date(),
-      });
+  doc.approvalFlow.push({
+    role: 'manager',
+    status: 'approved',
+    decidedBy: new Types.ObjectId(managerId),
+    decidedAt: new Date(),
+  });
 
-      return doc.save();
-    },
+  return doc.save();
+},
 
     managerReject: async (id: string, managerId: string, reason?: string) => {
       const doc = await this.requestModel.findById(id).exec();
@@ -594,20 +590,23 @@ async getTeamLeaves(managerEmployeeId: string): Promise<TeamLeaveSummary[]> {
       return doc.save();
     },
 
-    /**
-     * REQUIREMENT 2: BULK REQUEST PROCESSING (HR Manager)
-     */
+    //hr
+
 hrApprove: async (id: string, hrId: string) => {
   const doc = await this.requestModel.findById(id).exec();
   if (!doc) throw new NotFoundException('Leave request not found');
-  if (doc.status !== LeaveStatus.PENDING) {
-    throw new BadRequestException('Request is not pending');
+
+  if (doc.status !== LeaveStatus.MANAGER_APPROVED) {
+    throw new BadRequestException('Request is not awaiting HR review');
   }
+
+  // ✅ FINAL approval consumes pending
   await this.consumePendingToTaken(
     doc.employeeId as any,
     doc.leaveTypeId as any,
     doc.durationDays,
   );
+
   doc.status = LeaveStatus.APPROVED;
   doc.approvalFlow.push({
     role: 'hr',
@@ -615,19 +614,25 @@ hrApprove: async (id: string, hrId: string) => {
     decidedBy: new Types.ObjectId(hrId),
     decidedAt: new Date(),
   });
+
   return doc.save();
 },
 
 hrReject: async (id: string, hrId: string, reason?: string) => {
   const doc = await this.requestModel.findById(id).exec();
   if (!doc) throw new NotFoundException('Leave request not found');
-  if (doc.status === LeaveStatus.PENDING) {
-    await this.releasePending(
-      doc.employeeId as any,
-      doc.leaveTypeId as any,
-      doc.durationDays,
-    );
+
+  if (doc.status !== LeaveStatus.MANAGER_APPROVED) {
+    throw new BadRequestException('Request is not awaiting HR review');
   }
+
+  // ✅ HR rejection releases pending
+  await this.releasePending(
+    doc.employeeId as any,
+    doc.leaveTypeId as any,
+    doc.durationDays,
+  );
+
   doc.status = LeaveStatus.REJECTED;
   doc.approvalFlow.push({
     role: 'hr',
@@ -635,13 +640,21 @@ hrReject: async (id: string, hrId: string, reason?: string) => {
     decidedBy: new Types.ObjectId(hrId),
     decidedAt: new Date(),
   });
+
   return doc.save();
 },
+
+
+    /**
+     * REQUIREMENT 2: BULK REQUEST PROCESSING (HR Manager)
+     */
+
 
 // bulkProcess
 bulkProcess: async (dto: BulkLeaveRequestDto) => {
   const success: LeaveRequestDocument[] = [];
   const failed: Array<{ id: string; reason: string }> = [];
+
   for (const item of dto.requests) {
     try {
       const request = await this.requestModel.findById(item.id).exec();
@@ -649,20 +662,17 @@ bulkProcess: async (dto: BulkLeaveRequestDto) => {
         failed.push({ id: item.id, reason: 'Request not found' });
         continue;
       }
-      if (request.status !== LeaveStatus.PENDING) {
-        failed.push({ id: item.id, reason: 'Request is not pending' });
+
+      // ✅ Bulk should operate at HR stage (after manager approval)
+      if (request.status !== LeaveStatus.MANAGER_APPROVED) {
+        failed.push({ id: item.id, reason: 'Request is not awaiting HR review' });
         continue;
       }
+
       if (item.decision === 'APPROVED') {
-        const res = await this.leaveRequest.hrApprove(item.id, dto.approverId);
-        success.push(res);
+        success.push(await this.leaveRequest.hrApprove(item.id, dto.approverId));
       } else if (item.decision === 'REJECTED') {
-        const res = await this.leaveRequest.hrReject(
-          item.id,
-          dto.approverId,
-          item.reason,
-        );
-        success.push(res);
+        success.push(await this.leaveRequest.hrReject(item.id, dto.approverId, item.reason));
       } else {
         failed.push({ id: item.id, reason: 'Unknown decision' });
       }
@@ -670,9 +680,9 @@ bulkProcess: async (dto: BulkLeaveRequestDto) => {
       failed.push({ id: item.id, reason: err.message || 'Error processing request' });
     }
   }
+
   return { success, failed };
 },
-
     
     
 
@@ -720,6 +730,7 @@ bulkProcess: async (dto: BulkLeaveRequestDto) => {
         remaining: dto.totalDays + (dto.carriedOverDays || 0),
         accruedActual: 0,
         accruedRounded: 0,
+        year: dto.year,
       });
 
       return doc.save();

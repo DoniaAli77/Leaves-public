@@ -389,16 +389,15 @@ async getTeamSummaryForManagerEmployeeId(managerEmployeeId: string) {
     .select('primaryPositionId')
     .lean();
 
-  if (!manager) {
-    throw new NotFoundException('Manager profile not found');
-  }
+  if (!manager) throw new NotFoundException('Manager profile not found');
+  if (!manager.primaryPositionId) throw new BadRequestException('Manager has no primaryPositionId set');
 
-  if (!manager.primaryPositionId) {
-    throw new BadRequestException('Manager has no primaryPositionId set');
-  }
-
-  // reuse your existing function (expects supervisorPositionId == manager position id)
-  return this.getTeamSummaryForManager(manager.primaryPositionId.toString());
+  return this.employeeModel
+    .find({ supervisorPositionId: manager.primaryPositionId })
+    .select('firstName lastName primaryDepartmentId primaryPositionId status')
+    .populate('primaryDepartmentId')
+    .populate('primaryPositionId')
+    .lean();
 }
 
 

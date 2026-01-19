@@ -1,6 +1,7 @@
 export enum LeaveStatus {
-  PENDING = 'pending',
-  APPROVED = 'approved',
+  PENDING = 'pending',                 // waiting for direct manager
+  MANAGER_APPROVED = 'manager_approved', // waiting for HR review step
+  APPROVED = 'approved',               // final
   REJECTED = 'rejected',
   CANCELLED = 'cancelled',
 }

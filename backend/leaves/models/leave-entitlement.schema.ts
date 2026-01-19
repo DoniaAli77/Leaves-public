@@ -5,41 +5,54 @@ export type LeaveEntitlementDocument = HydratedDocument<LeaveEntitlement>;
 
 @Schema({ timestamps: true })
 export class LeaveEntitlement {
-
   // The employee whose entitlement this is
-  @Prop({ type: Types.ObjectId, ref: 'EmployeeProfile', required: true })
+  @Prop({
+    type: Types.ObjectId,
+    ref: 'EmployeeProfile',
+    required: true,
+    index: true,
+  })
   employeeId: Types.ObjectId;
 
   // The leave type (Annual, Sick, Maternity, etc.)
-  @Prop({ type: Types.ObjectId, ref: 'LeaveType', required: true })
+  @Prop({
+    type: Types.ObjectId,
+    ref: 'LeaveType',
+    required: true,
+    index: true,
+  })
   leaveTypeId: Types.ObjectId;
 
+  // The entitlement cycle year (required because your service checks uniqueness by year)
+  @Prop({ required: true, index: true })
+  year: number;
+
   // Total entitlement per year
-  @Prop({ default: 0 })
+  @Prop({ default: 0, min: 0 })
   yearlyEntitlement: number;
 
   // Accrued before rounding
-  @Prop({ default: 0 })
+  @Prop({ default: 0, min: 0 })
   accruedActual: number;
 
   // Rounded accrued value saved for UI & usage
-  @Prop({ default: 0 })
+  @Prop({ default: 0, min: 0 })
   accruedRounded: number;
 
   // Carried forward from last cycle
-  @Prop({ default: 0 })
+  @Prop({ default: 0, min: 0 })
   carryForward: number;
 
   // Approved & consumed leave
-  @Prop({ default: 0 })
+  @Prop({ default: 0, min: 0 })
   taken: number;
 
   // Pending approval
-  @Prop({ default: 0 })
+  @Prop({ default: 0, min: 0 })
   pending: number;
 
   // Remaining after taken & pending
-  @Prop({ default: 0 })
+  @Prop({ default: 0, min: 0 })
   remaining: number;
 
   @Prop()
@@ -51,3 +64,9 @@ export class LeaveEntitlement {
 
 export const LeaveEntitlementSchema =
   SchemaFactory.createForClass(LeaveEntitlement);
+
+// ✅ Prevent duplicates: one entitlement per employee + leaveType + year
+LeaveEntitlementSchema.index(
+  { employeeId: 1, leaveTypeId: 1, year: 1 },
+  { unique: true },
+);
