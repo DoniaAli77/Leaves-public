@@ -212,17 +212,29 @@ export default function LeaveRequestsPage() {
     <div className="min-h-screen p-10 text-white bg-slate-900">
       <div className="max-w-5xl mx-auto">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-4xl font-semibold">Leave Requests</h1>
+  <h1 className="text-4xl font-semibold">Leave Requests</h1>
 
-          {canCreate && (
-            <Link
-              href="/subsystems/leaves/requests/create"
-              className="px-5 py-3 bg-blue-600 rounded-lg hover:bg-blue-700 transition"
-            >
-              + New Request
-            </Link>
-          )}
-        </div>
+  {/* RIGHT SIDE BUTTONS */}
+  <div className="flex items-center gap-3">
+    {/* History button (ALL roles can use it) */}
+    <Link
+      href="/subsystems/leaves/requests/history"
+      className="px-5 py-3 bg-slate-700 rounded-lg hover:bg-slate-600 transition"
+    >
+      Request History
+    </Link>
+
+    {/* Existing create button (only roles that can create) */}
+    {canCreate && (
+      <Link
+        href="/subsystems/leaves/requests/create"
+        className="px-5 py-3 bg-blue-600 rounded-lg hover:bg-blue-700 transition"
+      >
+        + New Request
+      </Link>
+    )}
+  </div>
+</div>
 
         {/* Bulk box (HR Manager only) */}
         {canBulk && (

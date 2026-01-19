@@ -1678,40 +1678,51 @@ export default function Dashboard() {
 
 
         {/* ===== HR EMPLOYEE ===== */}
-        {role === "HR_EMPLOYEE" && (
-          <div className="lg:col-span-3">
-            <div className="glass-card p-6">
-              <h2 className="text-xl font-semibold mb-6 text-white border-b border-white/10 pb-3">
-                HR Panel
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <button
-                onClick={() => router.push("/hr/employees")}
-                  className="glass-btn h-24 flex flex-col items-center justify-center gap-2 hover:bg-white/12 transition-all"
-              >
-                  <span className="text-2xl">👤</span>
-                  <span className="text-sm font-medium">Manage Employees</span>
-              </button>
+{role === "HR_EMPLOYEE" && (
+  <div className="lg:col-span-3">
+    <div className="glass-card p-6">
+      <h2 className="text-xl font-semibold mb-6 text-white border-b border-white/10 pb-3">
+        HR Panel
+      </h2>
 
-              <button
-                onClick={() => router.push("/organization-structure")}
-                  className="glass-btn h-24 flex flex-col items-center justify-center gap-2 hover:bg-white/12 transition-all"
-              >
-                  <span className="text-2xl">🏢</span>
-                  <span className="text-sm font-medium">Organization Structure</span>
-              </button>
+      {/* ✅ changed md:grid-cols-3 -> md:grid-cols-4 */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <button
+          onClick={() => router.push("/hr/employees")}
+          className="glass-btn h-24 flex flex-col items-center justify-center gap-2 hover:bg-white/12 transition-all"
+        >
+          <span className="text-2xl">👤</span>
+          <span className="text-sm font-medium">Manage Employees</span>
+        </button>
 
-              <button
-                onClick={() => router.push("/hr/change-requests")}
-                  className="glow-btn h-24 flex flex-col items-center justify-center gap-2 transition-all"
-              >
-                  <span className="text-2xl">📄</span>
-                  <span className="text-sm font-medium">Approve Requests</span>
-              </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <button
+          onClick={() => router.push("/organization-structure")}
+          className="glass-btn h-24 flex flex-col items-center justify-center gap-2 hover:bg-white/12 transition-all"
+        >
+          <span className="text-2xl">🏢</span>
+          <span className="text-sm font-medium">Organization Structure</span>
+        </button>
+
+        <button
+          onClick={() => router.push("/hr/change-requests")}
+          className="glow-btn h-24 flex flex-col items-center justify-center gap-2 transition-all"
+        >
+          <span className="text-2xl">📄</span>
+          <span className="text-sm font-medium">Approve Requests</span>
+        </button>
+
+        {/* ✅ NEW: Request History (needed for “all roles” history requirement) */}
+        <button
+          onClick={() => router.push("/subsystems/leaves/requests/history")}
+          className="glass-btn h-24 flex flex-col items-center justify-center gap-2 hover:bg-white/12 transition-all"
+        >
+          <span className="text-2xl">🕘</span>
+          <span className="text-sm font-medium">Request History</span>
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
 
 
@@ -1736,7 +1747,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* ✅ changed md:grid-cols-4 -> md:grid-cols-5 */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <button
           onClick={() => router.push("/subsystems/leaves/policies")}
           className="glass-btn h-24 flex flex-col items-center justify-center gap-2 hover:bg-white/12 transition-all"
@@ -1768,15 +1780,20 @@ export default function Dashboard() {
           <span className="text-2xl">✅</span>
           <span className="text-sm font-medium">Compliance Review</span>
         </button>
+
+        {/* ✅ NEW: Request History */}
+        <button
+          onClick={() => router.push("/subsystems/leaves/requests/history")}
+          className="glass-btn h-24 flex flex-col items-center justify-center gap-2 hover:bg-white/12 transition-all"
+        >
+          <span className="text-2xl">🕘</span>
+          <span className="text-sm font-medium">Request History</span>
+        </button>
       </div>
 
       <div className="mt-4 text-xs text-white/50 space-y-1">
-        <p>
-          • HR Admin does compliance review after manager approval (REQ-025).
-        </p>
-        <p>
-          • Expiry policies are enforced in year-end processing (REQ-041).
-        </p>
+        <p>• HR Admin does compliance review after manager approval (REQ-025).</p>
+        <p>• Expiry policies are enforced in year-end processing (REQ-041).</p>
       </div>
     </div>
   </div>

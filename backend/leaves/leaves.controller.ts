@@ -168,6 +168,17 @@ export class LeavesController {
   // ===================================================
   // LEAVE REQUEST
   // ===================================================
+
+// ===================================================
+  // ✅ REQUIREMENT 3: FILTER REQUEST HISTORY (All Roles)
+  // ===================================================
+  @Get('leave-request/history')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  filterHistory(@Query() params: FilterLeaveRequestsDto) {
+    return this.service.leaveRequest.filter(params);
+  }
+
+
   @Post('leave-request')
   @UsePipes(new ValidationPipe({ whitelist: true }))
   createRequest(@Body() dto: CreateLeaveRequestDto) {
@@ -217,14 +228,7 @@ export class LeavesController {
     return this.service.leaveRequest.bulkProcess(dto);
   }
 
-  // ===================================================
-  // ✅ REQUIREMENT 3: FILTER REQUEST HISTORY (All Roles)
-  // ===================================================
-  @Get('leave-request/history')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  filterHistory(@Query() params: FilterLeaveRequestsDto) {
-    return this.service.leaveRequest.filter(params);
-  }
+  
 
   // ===================================================
   // ✅ REQUIREMENT 4: VIEW TEAM BALANCES + UPCOMING LEAVES (Direct Manager)
