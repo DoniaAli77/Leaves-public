@@ -10,7 +10,32 @@ npm install
 npm run start:dev
 ```
 
+.env file content :
+# Server
+NODE_ENV=development
+PORT=3001
+
+# MongoDB Atlas
+MONGO_URI=your_mongodb_connection_string_here
+DATABASE_NAME=hr_system
+
+# JWT
+JWT_SECRET=your_jwt_secret_here
+JWT_EXPIRATION=24h
+
+# CORS
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
+
 Server runs on: `http://localhost:3000/api/v1`
+
+
+for frontend .env.local
+NEXT_PUBLIC_API_URL=http://localhost:3001
+
+
+
+
+
 
 ## 📋 Milestone 1 :
 
