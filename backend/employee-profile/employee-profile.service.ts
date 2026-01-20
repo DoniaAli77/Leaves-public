@@ -384,21 +384,37 @@ async getTeamSummaryForManager(managerEmployeeId: string) {
 
 // ✅ Manager uses EMPLOYEE ID (from JWT), but team is linked by POSITION ID.
 async getTeamSummaryForManagerEmployeeId(managerEmployeeId: string) {
+  // 1) Get manager primaryPositionId (this is the key for finding direct reports)
   const manager = await this.employeeModel
     .findById(managerEmployeeId)
-    .select('primaryPositionId')
+    .select("_id primaryPositionId")
     .lean();
 
-  if (!manager) throw new NotFoundException('Manager profile not found');
-  if (!manager.primaryPositionId) throw new BadRequestException('Manager has no primaryPositionId set');
+  if (!manager) {
+    throw new NotFoundException("Manager profile not found");
+  }
 
-  return this.employeeModel
+  if (!manager.primaryPositionId) {
+    throw new BadRequestException("Manager has no primaryPositionId set");
+  }
+
+  // 2) Find direct reports: supervisorPositionId == manager.primaryPositionId
+  // IMPORTANT: NO POPULATE here (Department schema isn't registered => 500)
+  const team = await this.employeeModel
     .find({ supervisorPositionId: manager.primaryPositionId })
-    .select('firstName lastName primaryDepartmentId primaryPositionId status')
-    .populate('primaryDepartmentId')
-    .populate('primaryPositionId')
+    .select(
+      "_id employeeNumber firstName lastName primaryDepartmentId primaryPositionId supervisorPositionId status"
+    )
     .lean();
+
+  // 3) Return team summary
+  // Add a computed name so your LeavesService/UI can show something friendly.
+  return team.map((m: any) => ({
+    ...m,
+    employeeName: `${m.firstName ?? ""} ${m.lastName ?? ""}`.trim(),
+  }));
 }
+
 
 
 

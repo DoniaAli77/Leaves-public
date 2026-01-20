@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { EmployeeProfileController } from './employee-profile.controller';
 import { EmployeeProfileService } from './employee-profile.service';
+
 import { Candidate, CandidateSchema } from './models/candidate.schema';
 import {
   EmployeeProfile,
@@ -20,6 +21,16 @@ import {
   EmployeeQualificationSchema,
 } from './models/qualification.schema';
 
+// ✅ ADD THESE:
+import {
+  Department,
+  DepartmentSchema,
+} from '../organization-structure/models/department.schema';
+import {
+  Position,
+  PositionSchema,
+} from '../organization-structure/models/position.schema';
+
 @Module({
   imports: [
     MongooseModule.forFeature([
@@ -31,6 +42,10 @@ import {
         schema: EmployeeProfileChangeRequestSchema,
       },
       { name: EmployeeQualification.name, schema: EmployeeQualificationSchema },
+
+      // ✅ REGISTER MODELS USED BY populate()
+      { name: Department.name, schema: DepartmentSchema },
+      { name: Position.name, schema: PositionSchema },
     ]),
   ],
   controllers: [EmployeeProfileController],
