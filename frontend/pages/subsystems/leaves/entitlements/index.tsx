@@ -60,6 +60,7 @@ function isDepartmentHeadRole(role: string) {
 }
 
 function isHRAdminRole(role: string) {
+  console.log("Checking HR Admin role for:", role);
   return role === "HR Admin" || role === "HR_ADMIN" || role === "hr admin";
 }
 

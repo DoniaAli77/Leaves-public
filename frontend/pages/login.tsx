@@ -24,6 +24,7 @@ export default function LoginPage() {
       });
 
       const { access_token, payload } = res.data;
+      console.log("Login successful:", payload);
 
       // Save auth info
       localStorage.setItem("token", access_token);

@@ -7,7 +7,7 @@ export type payGradeDocument = HydratedDocument<payGrade>
 
 @Schema({ timestamps: true })
 export class payGrade {
-    @Prop({ required: true, unique: true })
+    @Prop({ required: true,  })
     grade: string; // position garde and name like:  Junior TA, Mid TA, Senior TA
     @Prop({ required: true, min: 6000 })
     baseSalary: number

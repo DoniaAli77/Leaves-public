@@ -22,7 +22,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        const mongoUri = configService.get<string>('MONGO_URI') || 'mongodb://localhost:27017/hr_system';
+        const mongoUri = configService.get<string>('MONGO_URI') || 'mongodb://localhost:27017/hrSystem_v1';
         return {
           uri: mongoUri,
         };
