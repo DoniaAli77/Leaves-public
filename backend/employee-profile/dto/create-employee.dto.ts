@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsDateString, IsEnum, IsObject } from 'class-validator';
+import { IsString, IsOptional, IsDateString, IsEnum, IsObject, IsMongoId } from 'class-validator';
 import { ContractType, WorkType, EmployeeStatus } from '../enums/employee-profile.enums';
 
 export class CreateEmployeeDto {
@@ -62,7 +62,7 @@ export class CreateEmployeeDto {
   status?: EmployeeStatus;
 
   @IsOptional()
-  @IsString()
+  @IsMongoId()
   primaryPositionId?: string;
 
   @IsOptional()
@@ -70,7 +70,7 @@ export class CreateEmployeeDto {
   primaryDepartmentId?: string;
 
   @IsOptional()
-  @IsString()
+  @IsMongoId()
   supervisorPositionId?: string;
 
   @IsOptional()

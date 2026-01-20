@@ -1,6 +1,12 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import {
   EmployeeProfile,
   EmployeeProfileDocument,
@@ -10,62 +16,114 @@ import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { SelfUpdateDto } from './dto/self-update.dto';
 import { EmployeeProfileChangeRequest } from './models/ep-change-request.schema';
 import { CreateChangeRequestDto } from './dto/create-change-request.dto';
-import { ProfileChangeStatus } from './enums/employee-profile.enums';
+import { EmployeeStatus, ProfileChangeStatus } from './enums/employee-profile.enums';
 import { randomUUID } from 'crypto';
-import { EmployeeStatus } from './enums/employee-profile.enums';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class EmployeeProfileService {
   constructor(
-  @InjectModel(EmployeeProfile.name)
-  private readonly employeeModel: Model<EmployeeProfileDocument>,
+    @InjectModel(EmployeeProfile.name)
+    private readonly employeeModel: Model<EmployeeProfileDocument>,
 
-  @InjectModel(EmployeeProfileChangeRequest.name)
-  private readonly changeRequestModel: Model<EmployeeProfileChangeRequest>,
-) {}
+    @InjectModel(EmployeeProfileChangeRequest.name)
+    private readonly changeRequestModel: Model<EmployeeProfileChangeRequest>,
+  ) {}
 
-private readonly ALLOWED_CHANGE_REQUEST_FIELDS = [
-  'nationalId',
-  'personalEmail',
-  'workEmail',
-  'firstName',
-  'lastName',
-];
+  /**
+   * ✅ Project-level guardrail for updates:
+   * - runValidators: enforce schema validation on update queries
+   * - context: 'query': needed for certain validators/plugins
+   */
+  private readonly UPDATE_OPTS = {
+    new: true,
+    runValidators: true,
+    context: 'query' as const,
+  };
+
+  /**
+   * Convert a string (from DTO / JSON) into a real Mongo ObjectId,
+   * but only if it was provided.
+   *
+   * Why: your schema uses Types.ObjectId for these fields, but DTOs use string.
+   * If you store strings, equality checks fail (string !== ObjectId),
+   * and team queries break.
+   */
+  private toObjectIdOrUndefined(fieldName: string, value?: string) {
+    if (value === undefined || value === null || value === '') return undefined;
+
+    if (!Types.ObjectId.isValid(value)) {
+      throw new BadRequestException(
+        `${fieldName} must be a valid MongoId (24 hex chars)`,
+      );
+    }
+    return new Types.ObjectId(value);
+  }
+
+  /**
+   * Some fields in EmployeeProfile are ObjectId typed in schema.
+   * This method ensures we always write correct ObjectId values.
+   */
+  private normalizeOrgLinks(payload: any) {
+    if (payload.primaryPositionId !== undefined) {
+      payload.primaryPositionId = this.toObjectIdOrUndefined(
+        'primaryPositionId',
+        payload.primaryPositionId,
+      );
+    }
+    if (payload.supervisorPositionId !== undefined) {
+      payload.supervisorPositionId = this.toObjectIdOrUndefined(
+        'supervisorPositionId',
+        payload.supervisorPositionId,
+      );
+    }
+    if (payload.primaryDepartmentId !== undefined) {
+      payload.primaryDepartmentId = this.toObjectIdOrUndefined(
+        'primaryDepartmentId',
+        payload.primaryDepartmentId,
+      );
+    }
+    return payload;
+  }
+
   // -------- CREATE (HR / Admin) --------
   async create(createDto: CreateEmployeeDto) {
-    // Mongoose will cast strings to Date/ObjectId as needed
-    const created = new this.employeeModel({
-      ...createDto,
-      dateOfHire: new Date(createDto.dateOfHire),
-      contractStartDate: createDto.contractStartDate
-        ? new Date(createDto.contractStartDate)
-        : undefined,
-      contractEndDate: createDto.contractEndDate
-        ? new Date(createDto.contractEndDate)
-        : undefined,
-    });
+    const payload: any = { ...createDto };
+
+    // convert dates
+    payload.dateOfHire = new Date(createDto.dateOfHire);
+    payload.contractStartDate = createDto.contractStartDate
+      ? new Date(createDto.contractStartDate)
+      : undefined;
+    payload.contractEndDate = createDto.contractEndDate
+      ? new Date(createDto.contractEndDate)
+      : undefined;
+
+    // ✅ CRITICAL: Convert org structure links to ObjectId
+    this.normalizeOrgLinks(payload);
+
+    const created = new this.employeeModel(payload);
     return created.save();
-  }
+  }
 
   // -------- READ ALL --------
   async findAll(page: number = 1, limit: number = 10) {
-  const skip = (page - 1) * limit;
+    const skip = (page - 1) * limit;
 
-  return this.employeeModel
-    .find()
-    .skip(skip)
-    .limit(limit)
-    .populate('primaryDepartmentId')
-    .populate('primaryPositionId')
-    .populate('supervisorPositionId')
-    .lean();
-}
+    return this.employeeModel
+      .find()
+      .skip(skip)
+      .limit(limit)
+      .populate('primaryDepartmentId')
+      .populate('primaryPositionId')
+      .populate('supervisorPositionId')
+      .lean();
+  }
 
   // -------- READ ONE --------
   async findOne(id: string) {
     const employee = await this.employeeModel
-      .findById( id )
+      .findById(id)
       .populate('primaryDepartmentId')
       .populate('primaryPositionId')
       .populate('supervisorPositionId')
@@ -77,454 +135,418 @@ private readonly ALLOWED_CHANGE_REQUEST_FIELDS = [
 
     return employee;
   }
+
   // -------- SET / CHANGE PASSWORD (HR/Admin) --------
-async setPassword(id: string, password: string) {
-  // Step 1: find employee
-  const employee = await this.employeeModel.findById(id);
-  if (!employee) {
-    throw new NotFoundException("Employee not found 🧑‍🏫");
+  async setPassword(id: string, password: string) {
+    const employee = await this.employeeModel.findById(id);
+    if (!employee) {
+      throw new NotFoundException('Employee not found 🧑‍🏫');
+    }
+
+    const hashed = await bcrypt.hash(password, 10);
+
+    await this.employeeModel.findByIdAndUpdate(
+      id,
+      { password: hashed },
+      this.UPDATE_OPTS,
+    );
+
+    return { message: 'Password updated successfully 🔐', id };
   }
 
-  // Step 2: hash the password (hide it like magic 🔮)
-  const hashed = await bcrypt.hash(password, 10);
-
-  // Step 3: save hashed password
-  await this.employeeModel.findByIdAndUpdate(
-    id,
-    { password: hashed },
-    { new: true }
-  );
-
-  // Step 4: say done ✅
-  return { message: "Password updated successfully 🔐", id };
-}
-
-  // -------- UPDATE (HR / Admin) --------
   // -------- UPDATE (HR / Admin) --------
   async update(id: string, updateDto: UpdateEmployeeDto) {
-    // convert dates if provided
     const payload: any = { ...updateDto };
 
-    if (updateDto.dateOfHire) {
-      payload.dateOfHire = new Date(updateDto.dateOfHire);
-    }
-    if (updateDto.contractStartDate) {
+    // convert dates if provided
+    if (updateDto.dateOfHire) payload.dateOfHire = new Date(updateDto.dateOfHire);
+    if (updateDto.contractStartDate)
       payload.contractStartDate = new Date(updateDto.contractStartDate);
-    }
-    if (updateDto.contractEndDate) {
+    if (updateDto.contractEndDate)
       payload.contractEndDate = new Date(updateDto.contractEndDate);
-    }
+
+    // ✅ CRITICAL: Convert org structure links to ObjectId
+    this.normalizeOrgLinks(payload);
 
     const updated = await this.employeeModel
-      .findByIdAndUpdate(id, payload, { new: true })
+      .findByIdAndUpdate(id, payload, this.UPDATE_OPTS)
       .lean();
 
     if (!updated) {
       throw new NotFoundException('Employee not found');
     }
 
-    return updated;
-  }
-  // -------- DELETE / DEACTIVATE (optional) --------
- 
-// -------- DEACTIVATE (NOT DELETE) --------
-
-
-async deactivate(id: string) {
-  // Step 1: find employee
-  const employee = await this.employeeModel.findById(id);
-  if (!employee) {
-    throw new NotFoundException("Employee not found 🧑‍🏫");
+    return updated;
   }
 
-  // Step 2: remember old status ✅ (schema still untouched)
-  const oldStatus = employee.status;
-
-  // Step 3: update employee to inactive using ENUM ✅
-  const updated = await this.employeeModel.findByIdAndUpdate(
-    id,
-    { status: EmployeeStatus.INACTIVE },
-    { new: true }
-  ).lean();
-
-  // Step 4: return response ✅
-  return {
-    message: "Employee is now deactivated 😴",
-    id,
-    oldStatus,
-    newStatus: EmployeeStatus.INACTIVE,
-    updatedEmployee: updated
-  };
-}
-
-// ================================
-// EMPLOYEE SELF-SERVICE UPDATE
-// ================================
-  async selfUpdate(employeeId: string, dto: SelfUpdateDto) {
-  const allowed = ['phone', 'personalEmail', 'workEmail', 'biography', 'address'];
-
-  // Remove any forbidden fields
-  const payload: any = {};
-  for (const key of allowed) {
-    if (dto[key] !== undefined) {
-      payload[key] = dto[key];
+  // -------- DEACTIVATE (NOT DELETE) --------
+  async deactivate(id: string) {
+    const employee = await this.employeeModel.findById(id);
+    if (!employee) {
+      throw new NotFoundException('Employee not found 🧑‍🏫');
     }
+
+    const oldStatus = employee.status;
+
+    const updated = await this.employeeModel
+      .findByIdAndUpdate(
+        id,
+        { status: EmployeeStatus.INACTIVE },
+        this.UPDATE_OPTS,
+      )
+      .lean();
+
+    return {
+      message: 'Employee is now deactivated 😴',
+      id,
+      oldStatus,
+      newStatus: EmployeeStatus.INACTIVE,
+      updatedEmployee: updated,
+    };
   }
 
-  const updated = await this.employeeModel.findByIdAndUpdate(
-    employeeId,
-    payload,
-    { new: true }
-  ).lean();
+  // ================================
+  // EMPLOYEE SELF-SERVICE UPDATE
+  // ================================
+  async selfUpdate(employeeId: string, dto: SelfUpdateDto) {
+    const allowed = ['phone', 'personalEmail', 'workEmail', 'biography', 'address'];
 
-  if (!updated) {
-    throw new NotFoundException('Employee not found');
+    const payload: any = {};
+    for (const key of allowed) {
+      if ((dto as any)[key] !== undefined) {
+        payload[key] = (dto as any)[key];
+      }
+    }
+
+    const updated = await this.employeeModel
+      .findByIdAndUpdate(employeeId, payload, this.UPDATE_OPTS)
+      .lean();
+
+    if (!updated) {
+      throw new NotFoundException('Employee not found');
+    }
+
+    return updated;
   }
 
-  return updated;
-}
-// ================================
-// CREATE CHANGE REQUEST (Employee)
-// ================================
-// ================================
-// CREATE CHANGE REQUEST (Employee)
-// ================================
-async createChangeRequest(employeeId: string, dto: CreateChangeRequestDto) {
-  if (!dto) {
-    throw new UnauthorizedException("Request body is empty ❌");
+  // ================================
+  // CREATE CHANGE REQUEST (Employee)
+  // ================================
+  async createChangeRequest(employeeId: string, dto: CreateChangeRequestDto) {
+    if (!dto) {
+      throw new UnauthorizedException('Request body is empty ❌');
+    }
+
+    const employee = await this.employeeModel.findById(employeeId);
+    if (!employee) {
+      throw new NotFoundException('Employee not found ❌');
+    }
+
+    const profileId = dto.employeeProfileId;
+    if (!profileId) {
+      throw new ForbiddenException('employeeProfileId is required in body ❌');
+    }
+
+    const ALLOWED_FIELDS: CreateChangeRequestDto['field'][] = [
+      'firstName',
+      'lastName',
+      'nationalId',
+      'primaryPositionId',
+      'primaryDepartmentId',
+      'contractType',
+      'workType',
+    ];
+
+    if (!ALLOWED_FIELDS.includes(dto.field)) {
+      throw new ForbiddenException(`Invalid field '${dto.field}' ❌`);
+    }
+
+    const requestId = randomUUID();
+    const requestDescription = JSON.stringify({
+      field: dto.field,
+      newValue: dto.newValue,
+      reason: dto.reason ?? '',
+    });
+
+    const created = new this.changeRequestModel({
+      requestId,
+      employeeProfileId: profileId,
+      field: dto.field,
+      newValue: dto.newValue,
+      reason: dto.reason ?? '',
+      requestDescription,
+      status: ProfileChangeStatus.PENDING,
+      submittedAt: new Date(),
+    });
+
+    return created.save();
   }
 
-  const employee = await this.employeeModel.findById(employeeId);
-  if (!employee) {
-    throw new NotFoundException("Employee not found ❌");
+  // ================================
+  // GET ALL REQUESTS FOR EMPLOYEE
+  // ================================
+  async getEmployeeChangeRequests(employeeProfileId: string) {
+    return this.changeRequestModel
+      .find({ employeeProfileId })
+      .sort({ submittedAt: -1 })
+      .lean();
   }
 
-  // ✅ FIX: use dto.employeeProfileId (because DTO actually contains it)
-  const profileId = dto.employeeProfileId;
-  if (!profileId) {
-    throw new ForbiddenException("employeeProfileId is required in body ❌");
-  }
+  // ================================
+  // HR APPROVES REQUEST
+  // ================================
+  async approveChangeRequest(changeRequestMongoId: string) {
+    const request = await this.changeRequestModel.findById(changeRequestMongoId);
+    if (!request) {
+      throw new NotFoundException('Change request not found ❌');
+    }
 
-  // ✅ Validate field from DTO union
-  const ALLOWED_FIELDS: CreateChangeRequestDto["field"][] = [
-    'firstName',
-    'lastName',
-    'lastName',
-    'nationalId',
-    'primaryPositionId',
-    'primaryDepartmentId',
-    'contractType',
-    'workType',
-  ];
+    const raw = (request as any).requestDescription;
+    let data: { field: string; newValue: string; reason?: string };
 
-  if (!ALLOWED_FIELDS.includes(dto.field)) {
-    throw new ForbiddenException(
-      `Invalid field '${dto.field}' ❌`,
-    );
-  }
-
-  // ✅ Generate requestId & description correctly
-  const requestId = randomUUID();
-  const requestDescription = JSON.stringify({
-    field: dto.field,
-    newValue: dto.newValue,
-    reason: dto.reason ?? "",
-  });
-
-  const created = new this.changeRequestModel({
-    requestId,
-    employeeProfileId: profileId, // ✅ filled correctly now
-    field: dto.field,
-    newValue: dto.newValue,
-    reason: dto.reason ?? "",
-    requestDescription, // ✅ no double stringify
-    status: ProfileChangeStatus.PENDING,
-    submittedAt: new Date(),
-  });
-
-  return created.save(); // ✅ no schema failure anymore
-}
-
-
-// ================================
-// GET ALL REQUESTS FOR EMPLOYEE
-// ================================
-async getEmployeeChangeRequests(employeeProfileId: string) {
-  return this.changeRequestModel
-    .find({ employeeProfileId})
-    .sort({ submittedAt: -1 })
-    .lean();
-}
-// ================================
-// HR APPROVES REQUEST
-// ================================
-
-// HR APPROVES REQUEST
-// ================================
-
-async approveChangeRequest(changeRequestMongoId: string) {
-  const request = await this.changeRequestModel.findById(changeRequestMongoId);
-  if (!request) {
-    throw new NotFoundException("Change request not found ❌");
-  }
-
-  // ----------------- NEW PART -----------------
-  // We support 2 cases:
-  // 1) New format: requestDescription = JSON string {"field","newValue","reason"}
-  // 2) Old format: requestDescription = "Please update ..." and field/newValue stored directly
-  const raw = (request as any).requestDescription;
-  let data: { field: string; newValue: string; reason?: string };
-
-  if (typeof raw === 'string') {
-    if (raw.trim().startsWith('{')) {
-      // new format → parse JSON
-      try {
-        data = JSON.parse(raw);
-      } catch {
-        throw new BadRequestException(
-          'Corrupted requestDescription JSON ❌ – please recreate this change request',
-        );
+    if (typeof raw === 'string') {
+      if (raw.trim().startsWith('{')) {
+        try {
+          data = JSON.parse(raw);
+        } catch {
+          throw new BadRequestException(
+            'Corrupted requestDescription JSON ❌ – please recreate this change request',
+          );
+        }
+      } else {
+        data = {
+          field: (request as any).field,
+          newValue: (request as any).newValue,
+          reason: raw,
+        };
       }
     } else {
-      // old format → plain text reason, take field/newValue from document
-      data = {
-        field: (request as any).field,
-        newValue: (request as any).newValue,
-        reason: raw,
-      };
-    }
-  } else {
-    // if it's already stored as object for some reason
-    data = raw as any;
-  }
-
-  if (!data.field || !data.newValue) {
-    throw new BadRequestException(
-      'Change request is missing field/newValue ❌ – please create a new one',
-    );
-  }
-  // ----------------- END NEW PART -----------------
-
-  const employeeProfileId = (request as any).employeeProfileId;
-  const employee = await this.employeeModel.findById(employeeProfileId);
-  if (!employee) {
-    throw new NotFoundException('Employee not found ❌');
-  }
-
-  // special case for nationalId (unique)
-  if (data.field === 'nationalId') {
-    // if it’s the same value, just approve and exit
-    if (employee.nationalId === data.newValue) {
-      await this.changeRequestModel.findByIdAndUpdate(changeRequestMongoId, {
-        status: ProfileChangeStatus.APPROVED,
-      });
-      return {
-        message:
-          'No update needed – nationalId already has this value, request marked APPROVED ✅',
-      };
+      data = raw as any;
     }
 
-    const duplicate = await this.employeeModel.findOne({
-      nationalId: data.newValue,
-    });
-    if (duplicate) {
+    if (!data.field || !data.newValue) {
       throw new BadRequestException(
-        'Cannot approve – another employee already has this nationalId ❌',
+        'Change request is missing field/newValue ❌ – please create a new one',
       );
     }
+
+    const employeeProfileId = (request as any).employeeProfileId;
+    const employee = await this.employeeModel.findById(employeeProfileId);
+    if (!employee) {
+      throw new NotFoundException('Employee not found ❌');
+    }
+
+    // nationalId uniqueness check
+    if (data.field === 'nationalId') {
+      if (employee.nationalId === data.newValue) {
+        await this.changeRequestModel.findByIdAndUpdate(changeRequestMongoId, {
+          status: ProfileChangeStatus.APPROVED,
+        });
+        return {
+          message:
+            'No update needed – nationalId already has this value, request marked APPROVED ✅',
+        };
+      }
+
+      const duplicate = await this.employeeModel.findOne({
+        nationalId: data.newValue,
+      });
+      if (duplicate) {
+        throw new BadRequestException(
+          'Cannot approve – another employee already has this nationalId ❌',
+        );
+      }
+    }
+
+    // ✅ CRITICAL: if HR is approving ObjectId fields, store as ObjectId not string
+    let newValueToWrite: any = data.newValue;
+
+    if (
+      data.field === 'primaryPositionId' ||
+      data.field === 'supervisorPositionId' ||
+      data.field === 'primaryDepartmentId'
+    ) {
+      newValueToWrite = this.toObjectIdOrUndefined(data.field, data.newValue);
+    }
+
+    await this.employeeModel.findByIdAndUpdate(
+      employeeProfileId,
+      { [data.field]: newValueToWrite },
+      this.UPDATE_OPTS,
+    );
+
+    await this.changeRequestModel.findByIdAndUpdate(changeRequestMongoId, {
+      status: ProfileChangeStatus.APPROVED,
+    });
+
+    return { message: 'Change request approved and employee updated ✅' };
   }
 
-  // apply change
-  await this.employeeModel.findByIdAndUpdate(employeeProfileId, {
-    [data.field]: data.newValue,
-  });
+  async rejectChangeRequest(id: string, reason: string) {
+    const request = await this.changeRequestModel.findById(id);
+    if (!request) throw new NotFoundException('Request not found');
 
-  await this.changeRequestModel.findByIdAndUpdate(changeRequestMongoId, {
-    status: ProfileChangeStatus.APPROVED,
-  });
+    request.status = ProfileChangeStatus.REJECTED;
+    request.processedAt = new Date();
+    request.reason = reason;
 
-  return { message: 'Change request approved and employee updated ✅' };
-}
-
-
-
-
-async rejectChangeRequest(id: string, reason: string) {
-  const request = await this.changeRequestModel.findById(id);
-  if (!request) throw new NotFoundException('Request not found');
-
-  request.status = ProfileChangeStatus.REJECTED;
-  request.processedAt = new Date();
-  request.reason = reason;
-
-  return request.save();
-}
-
-// Manager sees list of employees reporting to them (only summary)
-async getTeamSummaryForManager(managerEmployeeId: string) {
-  // Step 1: get the manager profile
-  const manager = await this.employeeModel.findById(managerEmployeeId).lean();
-  if (!manager) {
-    throw new NotFoundException('Manager not found');
+    return request.save();
   }
 
-  // Step 2: manager MUST have a primaryPositionId (because employees point to supervisorPositionId)
-  if (!manager.primaryPositionId) {
-    throw new BadRequestException('Manager has no primaryPositionId');
+  // Manager sees list of employees reporting to them (only summary)
+  async getTeamSummaryForManager(managerEmployeeId: string) {
+    const manager = await this.employeeModel.findById(managerEmployeeId).lean();
+    if (!manager) {
+      throw new NotFoundException('Manager not found');
+    }
+
+    if (!manager.primaryPositionId) {
+      throw new BadRequestException('Manager has no primaryPositionId');
+    }
+
+    return this.employeeModel
+      .find({ supervisorPositionId: manager.primaryPositionId })
+      .select('firstName lastName primaryDepartmentId primaryPositionId status')
+      .populate('primaryDepartmentId')
+      .populate('primaryPositionId')
+      .lean();
   }
 
-  // Step 3: find employees whose supervisorPositionId = manager.primaryPositionId
-  return this.employeeModel
-    .find({ supervisorPositionId: manager.primaryPositionId })
-    .select('firstName lastName primaryDepartmentId primaryPositionId status')
-    .populate('primaryDepartmentId')
-    .populate('primaryPositionId')
-    .lean();
-}
+  // ✅ Manager uses EMPLOYEE ID (from JWT), but team is linked by POSITION ID.
+  async getTeamSummaryForManagerEmployeeId(managerEmployeeId: string) {
+    const manager = await this.employeeModel
+      .findById(managerEmployeeId)
+      .select('_id primaryPositionId')
+      .lean();
 
-// ✅ Manager uses EMPLOYEE ID (from JWT), but team is linked by POSITION ID.
-async getTeamSummaryForManagerEmployeeId(managerEmployeeId: string) {
-  // 1) Get manager primaryPositionId (this is the key for finding direct reports)
-  const manager = await this.employeeModel
-    .findById(managerEmployeeId)
-    .select("_id primaryPositionId")
-    .lean();
+    if (!manager) {
+      throw new NotFoundException('Manager profile not found');
+    }
 
-  if (!manager) {
-    throw new NotFoundException("Manager profile not found");
+    if (!manager.primaryPositionId) {
+      throw new BadRequestException('Manager has no primaryPositionId set');
+    }
+
+    const team = await this.employeeModel
+      .find({ supervisorPositionId: manager.primaryPositionId })
+      .select(
+        '_id employeeNumber firstName lastName primaryDepartmentId primaryPositionId supervisorPositionId status',
+      )
+      .lean();
+
+    return team.map((m: any) => ({
+      ...m,
+      employeeName: `${m.firstName ?? ''} ${m.lastName ?? ''}`.trim(),
+    }));
   }
 
-  if (!manager.primaryPositionId) {
-    throw new BadRequestException("Manager has no primaryPositionId set");
+  // Manager sees one employee but must belong to their team
+  async getTeamEmployeeSummary(managerEmployeeId: string, employeeId: string) {
+    const manager = await this.employeeModel
+      .findById(managerEmployeeId)
+      .select('_id primaryPositionId')
+      .lean();
+
+    if (!manager) throw new NotFoundException('Manager not found');
+    if (!manager.primaryPositionId)
+      throw new BadRequestException('Manager has no primaryPositionId');
+
+    const employee = await this.employeeModel
+      .findOne({
+        _id: employeeId,
+        supervisorPositionId: manager.primaryPositionId,
+      })
+      // ✅ your schema uses "status" everywhere else
+      .select('firstName lastName primaryDepartmentId primaryPositionId status')
+      .populate('primaryDepartmentId', 'name')
+      .populate('primaryPositionId', 'title')
+      .lean();
+
+    if (!employee) {
+      throw new NotFoundException('Employee not found in your team');
+    }
+
+    return employee;
   }
 
-  // 2) Find direct reports: supervisorPositionId == manager.primaryPositionId
-  // IMPORTANT: NO POPULATE here (Department schema isn't registered => 500)
-  const team = await this.employeeModel
-    .find({ supervisorPositionId: manager.primaryPositionId })
-    .select(
-      "_id employeeNumber firstName lastName primaryDepartmentId primaryPositionId supervisorPositionId status"
-    )
-    .lean();
-
-  // 3) Return team summary
-  // Add a computed name so your LeavesService/UI can show something friendly.
-  return team.map((m: any) => ({
-    ...m,
-    employeeName: `${m.firstName ?? ""} ${m.lastName ?? ""}`.trim(),
-  }));
-}
-
-
-
-
-
-// Manager sees one employee but must belong to their team
-async getTeamEmployeeSummary(managerId: string, employeeId: string) {
-  const employee = await this.employeeModel
-    .findOne({ _id: employeeId, supervisorPositionId: managerId }) // ✅ FIXED FIELD
-    .select('firstName lastName primaryDepartmentId primaryPositionId employeeStatus')
-    .populate('primaryDepartmentId', 'name')
-    .populate('primaryPositionId', 'title')
-
-    .lean();
-
-  if (!employee) {
-    throw new NotFoundException('Employee not found in your team');
+  async getAllChangeRequests() {
+    return this.changeRequestModel.find().sort({ submittedAt: -1 }).lean();
   }
 
-  return employee;
-}
-
-
-async getAllChangeRequests() {
-  return this.changeRequestModel
-    .find()
-    .sort({ submittedAt: -1 })
-    .lean();
-}
-
-// Find request by UUID only using existing requestId field
-async findChangeRequestByUUID(requestId: string) {
-  const request = await this.changeRequestModel.findOne({ requestId }).lean();
-  if (!request) {
-    throw new NotFoundException('Request not found');
+  async findChangeRequestByUUID(requestId: string) {
+    const request = await this.changeRequestModel.findOne({ requestId }).lean();
+    if (!request) {
+      throw new NotFoundException('Request not found');
+    }
+    return request;
   }
-  return request;
-}
 
-// ❗ Dispute logic (missing earlier)
-  async submitDispute(dto: { employeeProfileId: string; originalRequestId: string; dispute: string }) {
-  const requestId = randomUUID(); // REQUIRED
+  // Dispute logic
+  async submitDispute(dto: {
+    employeeProfileId: string;
+    originalRequestId: string;
+    dispute: string;
+  }) {
+    const requestId = randomUUID();
 
-  const created = new this.changeRequestModel({
-    requestId, // required
-    employeeProfileId: dto.employeeProfileId, // required
+    const created = new this.changeRequestModel({
+      requestId,
+      employeeProfileId: dto.employeeProfileId,
+      requestDescription: `disputeFor:${dto.originalRequestId}`,
+      reason: dto.dispute,
+      status: ProfileChangeStatus.PENDING,
+      submittedAt: new Date(),
+    });
 
-    // store the dispute target inside requestDescription
-    requestDescription:`disputeFor:${dto.originalRequestId}`,
+    return created.save();
+  }
 
-    reason: dto.dispute, // required
-    status: ProfileChangeStatus.PENDING, // using existing enum
-    submittedAt: new Date(),
-  });
-
-  return created.save();
-}
-
-  
-   
   async withdrawChangeRequest(id: string) {
-  const request = await this.changeRequestModel.findById(id);
-  if (!request) throw new NotFoundException('Request not found');
+    const request = await this.changeRequestModel.findById(id);
+    if (!request) throw new NotFoundException('Request not found');
 
-  // Can only withdraw if pending
-  if (request.status !== ProfileChangeStatus.PENDING) {
-    throw new Error('Only pending requests can be withdrawn');
+    if (request.status !== ProfileChangeStatus.PENDING) {
+      throw new Error('Only pending requests can be withdrawn');
+    }
+
+    request.status = ProfileChangeStatus.REJECTED;
+    request.reason = 'Withdrawn by employee';
+    request.processedAt = new Date();
+
+    await request.save();
+
+    return {
+      message: 'Change request withdrawn successfully',
+      requestId: request.requestId,
+      status: request.status,
+    };
   }
 
-  request.status = ProfileChangeStatus.REJECTED;
-  request.reason = "Withdrawn by employee";
-  request.processedAt = new Date();
+  async resolveDispute(id: string, resolution: string) {
+    const dispute = await this.changeRequestModel.findById(id);
+    if (!dispute) throw new NotFoundException('Dispute not found');
 
-  await request.save();
+    dispute.status = ProfileChangeStatus.REJECTED;
+    dispute.reason = resolution;
+    dispute.processedAt = new Date();
 
-  return {
-    message: 'Change request withdrawn successfully',
-    requestId: request.requestId,
-    status: request.status,
-  };
-}
+    return dispute.save();
+  }
 
+  async approveDispute(id: string, resolution: string) {
+    const dispute = await this.changeRequestModel.findById(id);
+    if (!dispute) throw new NotFoundException('Dispute not found');
 
+    dispute.status = ProfileChangeStatus.APPROVED;
+    dispute.reason = resolution;
+    dispute.processedAt = new Date();
 
-async resolveDispute(id: string, resolution: string) {
-  const dispute = await this.changeRequestModel.findById(id);
-  if (!dispute) throw new NotFoundException("Dispute not found");
+    return dispute.save();
+  }
 
-  // HR resolves dispute (must use enum)
-  dispute.status = ProfileChangeStatus.REJECTED;  // The dispute is now closed
-  dispute.reason = resolution;
-  dispute.processedAt = new Date();
-
-  return dispute.save();
-}
-async approveDispute(id: string, resolution: string) {
-  const dispute = await this.changeRequestModel.findById(id);
-  if (!dispute) throw new NotFoundException("Dispute not found");
-
-  // HR approves the dispute (employee wins)
-  dispute.status = ProfileChangeStatus.APPROVED;
-  dispute.reason = resolution;
-  dispute.processedAt = new Date();
-
-  return dispute.save();
-}
-async getMyProfile(userId: string) {
-  const me = await this.employeeModel.findById(userId).lean();
-  if (!me) throw new NotFoundException("Profile not found");
-  return me;
-}
-
-
+  async getMyProfile(userId: string) {
+    const me = await this.employeeModel.findById(userId).lean();
+    if (!me) throw new NotFoundException('Profile not found');
+    return me;
+  }
 }

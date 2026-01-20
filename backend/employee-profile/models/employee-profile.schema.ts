@@ -16,11 +16,27 @@ import { UserProfileBase } from './user-schema';
 
 export type EmployeeProfileDocument = HydratedDocument<EmployeeProfile>;
 
+/**
+ * If a client sends ObjectId fields as strings (JSON),
+ * convert them to real Types.ObjectId to prevent:
+ *   "string !== ObjectId" query mismatches.
+ */
+const toObjectId = (v: any) => {
+  if (v === undefined || v === null || v === '') return undefined;
+  if (v instanceof Types.ObjectId) return v;
+
+  if (typeof v === 'string') {
+    return Types.ObjectId.isValid(v) ? new Types.ObjectId(v) : v;
+  }
+
+  return v;
+};
+
 @Schema({ collection: 'employee_profiles', timestamps: true })
 export class EmployeeProfile extends UserProfileBase {
   // Core IDs
   @Prop({ type: String, required: true, unique: true })
-  employeeNumber: string; // HR/Payroll number
+  employeeNumber: string;
 
   @Prop({ type: Date, required: true })
   dateOfHire: Date;
@@ -44,7 +60,6 @@ export class EmployeeProfile extends UserProfileBase {
   @Prop({ type: String })
   bankAccountNumber?: string;
 
-  
   @Prop({
     type: String,
     enum: Object.values(ContractType),
@@ -71,25 +86,25 @@ export class EmployeeProfile extends UserProfileBase {
   statusEffectiveFrom?: Date;
 
   // Org Structure links
-  @Prop({ type: Types.ObjectId, ref: 'Position' })
+  @Prop({ type: Types.ObjectId, ref: 'Position', set: toObjectId })
   primaryPositionId?: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'Department' })
+  @Prop({ type: Types.ObjectId, ref: 'Department', set: toObjectId })
   primaryDepartmentId?: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'Position' })
+  @Prop({ type: Types.ObjectId, ref: 'Position', set: toObjectId })
   supervisorPositionId?: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: payGrade.name })
+  @Prop({ type: Types.ObjectId, ref: payGrade.name, set: toObjectId })
   payGradeId?: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'AppraisalRecord' })
+  @Prop({ type: Types.ObjectId, ref: 'AppraisalRecord', set: toObjectId })
   lastAppraisalRecordId?: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'AppraisalCycle' })
+  @Prop({ type: Types.ObjectId, ref: 'AppraisalCycle', set: toObjectId })
   lastAppraisalCycleId?: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'AppraisalTemplate' })
+  @Prop({ type: Types.ObjectId, ref: 'AppraisalTemplate', set: toObjectId })
   lastAppraisalTemplateId?: Types.ObjectId;
 
   @Prop({ type: Date })
@@ -109,8 +124,12 @@ export class EmployeeProfile extends UserProfileBase {
 
   @Prop({ type: String })
   lastDevelopmentPlanSummary?: string;
-  
 }
 
-export const EmployeeProfileSchema =
-  SchemaFactory.createForClass(EmployeeProfile);
+export const EmployeeProfileSchema = SchemaFactory.createForClass(EmployeeProfile);
+
+/**
+ * Typescript typings for SchemaOptions may not include this key in your version,
+ * but Mongoose supports it. Cast to any to avoid the compile error.
+ */
+(EmployeeProfileSchema as any).set('runSettersOnQuery', true);

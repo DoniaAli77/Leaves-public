@@ -1,9 +1,20 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // ✅ GLOBAL VALIDATION (DTOs work)
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,            // strips fields not in DTO
+      forbidNonWhitelisted: true, // throw error on extra fields
+      transform: true,            // enables DTO type transforms
+      transformOptions: { enableImplicitConversion: true },
+    }),
+  );
 
   // ✅ ENABLE CORS FOR FRONTEND
   app.enableCors({
@@ -24,7 +35,9 @@ async function bootstrap() {
   // ✅ START SERVER
   await app.listen(process.env.PORT || 3000);
 
-  console.log(`🚀 Backend running on http://localhost:${process.env.PORT || 3000}`);
+  console.log(
+    `🚀 Backend running on http://localhost:${process.env.PORT || 3000}`,
+  );
 }
 
 bootstrap();
