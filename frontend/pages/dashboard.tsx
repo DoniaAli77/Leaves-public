@@ -1504,10 +1504,12 @@ export default function Dashboard() {
           </div>
         )}
 
+
+
+
 {/* ===== DEPARTMENT HEAD (MANAGER) ===== */}
 {role === "DEPARTMENT_HEAD" && (
   <div className="lg:col-span-3">
-
     {/* ===== Manager Header ===== */}
     <div className="glass-card p-5 mb-4">
       <div className="flex items-start justify-between">
@@ -1516,7 +1518,7 @@ export default function Dashboard() {
             Manager Dashboard
           </h1>
           <p className="text-xs text-white/60">
-            Team Overview, Performance & Structure
+            Team Overview + Leave Balances + Upcoming Leaves
           </p>
         </div>
 
@@ -1529,21 +1531,65 @@ export default function Dashboard() {
     </div>
 
     {/* =====================================================
+       ✅ REQUIREMENT #4 — LEAVES (TEAM BALANCES + UPCOMING)
+       ===================================================== */}
+    <div className="glass-card p-6 mb-4">
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-semibold text-white">Leaves</h2>
+          <p className="text-xs text-white/60">
+            View your team members’ leave balances and upcoming approved leaves.
+          </p>
+        </div>
+
+        <div className="px-3 py-1.5 rounded bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-400/20">
+          <span className="text-xs font-bold text-cyan-200 uppercase tracking-wider">
+            TEAM
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <button
+          onClick={() => router.push("/subsystems/leaves/entitlements?scope=team")}
+          className="glass-btn h-24 flex flex-col items-center justify-center gap-2 hover:bg-white/12 transition-all"
+        >
+          <span className="text-2xl">🎁</span>
+          <span className="text-sm font-medium">Team Leave Balances</span>
+          <span className="text-[11px] text-white/50">
+            Remaining days per employee
+          </span>
+        </button>
+
+        <button
+          onClick={() => router.push("/subsystems/leaves/calendar?scope=team")}
+          className="glass-btn h-24 flex flex-col items-center justify-center gap-2 hover:bg-white/12 transition-all"
+        >
+          <span className="text-2xl">📅</span>
+          <span className="text-sm font-medium">Upcoming Team Leaves</span>
+          <span className="text-[11px] text-white/50">
+            Approved upcoming requests
+          </span>
+        </button>
+      </div>
+
+      <div className="mt-4 text-xs text-white/50 space-y-1">
+        <p>• Balances: show remaining days (team-only).</p>
+        <p>• Upcoming leaves: show approved requests on the calendar (team-only).</p>
+      </div>
+    </div>
+
+    {/* =====================================================
        1️⃣ EMPLOYEE PROFILE MODULE – MANAGER INSIGHT
        ===================================================== */}
     <div className="glass-card p-4 mb-4">
-      <h2 className="text-sm font-semibold text-white mb-2">
-        My Team Profiles
-      </h2>
+      <h2 className="text-sm font-semibold text-white mb-2">My Team Profiles</h2>
       <p className="text-xs text-white/60 mb-3">
-        View non-sensitive profile information for your direct and indirect
-        subordinates.
+        View non-sensitive profile information for your direct and indirect subordinates.
       </p>
 
       <div className="flex justify-between items-center">
-        <span className="text-xs text-white/50">
-          Read-only • Reporting-line restricted
-        </span>
+        <span className="text-xs text-white/50">Read-only • Reporting-line restricted</span>
 
         <button
           onClick={() => router.push("/manager/team")}
@@ -1558,17 +1604,13 @@ export default function Dashboard() {
        2️⃣ ORGANIZATION STRUCTURE MODULE – MANAGER VIEW
        ===================================================== */}
     <div className="glass-card p-4 mb-4">
-      <h2 className="text-sm font-semibold text-white mb-2">
-        Organization Structure
-      </h2>
+      <h2 className="text-sm font-semibold text-white mb-2">Organization Structure</h2>
       <p className="text-xs text-white/60 mb-3">
         View departments, positions, and reporting hierarchy.
       </p>
 
       <div className="flex justify-between items-center">
-        <span className="text-xs text-white/50">
-          View only • No structural edits
-        </span>
+        <span className="text-xs text-white/50">View only • No structural edits</span>
 
         <button
           onClick={() => router.push("/organization-structure/org-chart")}
@@ -1579,150 +1621,85 @@ export default function Dashboard() {
       </div>
     </div>
 
-  {/* ================= PERFORMANCE MODULE ================= */}
-<div className="glass-card p-4 mb-4">
-  <h2 className="text-sm font-semibold text-white mb-2">
-    Performance Management
-  </h2>
+    {/* ================= PERFORMANCE MODULE ================= */}
+    <div className="glass-card p-4 mb-4">
+      <h2 className="text-sm font-semibold text-white mb-2">Performance Management</h2>
 
-  <p className="text-xs text-white/60 mb-4">
-    Manage team appraisals during active performance cycles.
-  </p>
-
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-    {/* VIEW ACTIVE CYCLES */}
-    <div className="bg-white/5 border border-white/10 rounded p-4">
-      <h3 className="text-xs font-semibold text-white mb-1">
-        Active Cycles
-      </h3>
-      <p className="text-xs text-white/60 mb-3">
-        View currently active appraisal cycles.
+      <p className="text-xs text-white/60 mb-4">
+        Manage team appraisals during active performance cycles.
       </p>
 
-      <button
-        onClick={() => router.push("/performance/cycles")}
-        className="w-full px-4 py-2 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white"
-      >
-        View Cycles →
-      </button>
-    </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white/5 border border-white/10 rounded p-4">
+          <h3 className="text-xs font-semibold text-white mb-1">Active Cycles</h3>
+          <p className="text-xs text-white/60 mb-3">View currently active appraisal cycles.</p>
 
-    {/* MY TEAM APPRAISALS */}
-    <div className="bg-white/5 border border-white/10 rounded p-4">
-      <h3 className="text-xs font-semibold text-white mb-1">
-        Team Appraisals
-      </h3>
-      <p className="text-xs text-white/60 mb-3">
-        Evaluate employees and track appraisal status.
-      </p>
-
-      <button
-        onClick={() => router.push("/performance/appraisals")}
-        className="w-full px-4 py-2 text-xs rounded bg-cyan-600 hover:bg-cyan-500 text-white"
-      >
-        View Appraisals →
-      </button>
-    </div>
-
-    {/* 3. Performance Templates - Read Only */}
-          <div className="glass-card p-4 mb-3">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2 flex-1">
-                <h2 className="text-sm font-semibold text-white">Performance Templates</h2>
-                <span className="px-1.5 py-0.5 text-xs text-white/50 bg-amber-500/20 border border-amber-500/30 rounded">Read Only</span>
-                <p className="text-xs text-white/50">View assigned templates</p>
-              </div>
-              <button
-                onClick={() => router.push("/performance/templates")}
-                className="px-2.5 py-1 text-xs text-white font-medium rounded bg-purple-600 hover:bg-purple-500 transition-colors"
-              >
-                📋 View Templates
-              </button>
-            </div>
-            <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded text-xs text-amber-300/90">
-              <span className="text-amber-400">ℹ️</span> Templates are created and managed by HR. 
-              You can view them to understand the evaluation criteria used in appraisals.
-            </div>
-          </div>
-
-    {/* CREATE APPRAISAL */}
-    <div className="bg-white/5 border border-white/10 rounded p-4 md:col-span-2">
-      <h3 className="text-xs font-semibold text-white mb-1">
-        Create New Appraisal
-      </h3>
-      <p className="text-xs text-white/60 mb-3">
-        Start a new appraisal for an employee in an active cycle.
-      </p>
-
-      <button
-        onClick={() => router.push("/performance/appraisals/create")}
-        className="w-full px-4 py-2 text-xs rounded bg-green-600 hover:bg-green-500 text-white"
-      >
-        Create Appraisal →
-      </button>
-    </div>
-  </div>
-
-  {/* STATUS LEGEND */}
-  <div className="mt-4 text-xs text-white/50">
-    <p>• Draft → Manager still evaluating</p>
-    <p>• Manager Submitted → Sent to HR</p>
-    <p>• HR Published → Final result</p>
-  </div>
-</div>
+          <button
+            onClick={() => router.push("/performance/cycles")}
+            className="w-full px-4 py-2 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white"
+          >
+            View Cycles →
+          </button>
         </div>
-        )}
 
+        <div className="bg-white/5 border border-white/10 rounded p-4">
+          <h3 className="text-xs font-semibold text-white mb-1">Team Appraisals</h3>
+          <p className="text-xs text-white/60 mb-3">Evaluate employees and track appraisal status.</p>
 
+          <button
+            onClick={() => router.push("/performance/appraisals")}
+            className="w-full px-4 py-2 text-xs rounded bg-cyan-600 hover:bg-cyan-500 text-white"
+          >
+            View Appraisals →
+          </button>
+        </div>
 
+        <div className="glass-card p-4 mb-3 md:col-span-2">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2 flex-1">
+              <h2 className="text-sm font-semibold text-white">Performance Templates</h2>
+              <span className="px-1.5 py-0.5 text-xs text-white/50 bg-amber-500/20 border border-amber-500/30 rounded">
+                Read Only
+              </span>
+              <p className="text-xs text-white/50">View assigned templates</p>
+            </div>
+            <button
+              onClick={() => router.push("/performance/templates")}
+              className="px-2.5 py-1 text-xs text-white font-medium rounded bg-purple-600 hover:bg-purple-500 transition-colors"
+            >
+              📋 View Templates
+            </button>
+          </div>
+          <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded text-xs text-amber-300/90">
+            <span className="text-amber-400">ℹ️</span> Templates are created and managed by HR. You can view them to
+            understand the evaluation criteria used in appraisals.
+          </div>
+        </div>
 
-        {/* ===== HR EMPLOYEE ===== */}
-{role === "HR_EMPLOYEE" && (
-  <div className="lg:col-span-3">
-    <div className="glass-card p-6">
-      <h2 className="text-xl font-semibold mb-6 text-white border-b border-white/10 pb-3">
-        HR Panel
-      </h2>
+        <div className="bg-white/5 border border-white/10 rounded p-4 md:col-span-2">
+          <h3 className="text-xs font-semibold text-white mb-1">Create New Appraisal</h3>
+          <p className="text-xs text-white/60 mb-3">
+            Start a new appraisal for an employee in an active cycle.
+          </p>
 
-      {/* ✅ changed md:grid-cols-3 -> md:grid-cols-4 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <button
-          onClick={() => router.push("/hr/employees")}
-          className="glass-btn h-24 flex flex-col items-center justify-center gap-2 hover:bg-white/12 transition-all"
-        >
-          <span className="text-2xl">👤</span>
-          <span className="text-sm font-medium">Manage Employees</span>
-        </button>
+          <button
+            onClick={() => router.push("/performance/appraisals/create")}
+            className="w-full px-4 py-2 text-xs rounded bg-green-600 hover:bg-green-500 text-white"
+          >
+            Create Appraisal →
+          </button>
+        </div>
+      </div>
 
-        <button
-          onClick={() => router.push("/organization-structure")}
-          className="glass-btn h-24 flex flex-col items-center justify-center gap-2 hover:bg-white/12 transition-all"
-        >
-          <span className="text-2xl">🏢</span>
-          <span className="text-sm font-medium">Organization Structure</span>
-        </button>
-
-        <button
-          onClick={() => router.push("/hr/change-requests")}
-          className="glow-btn h-24 flex flex-col items-center justify-center gap-2 transition-all"
-        >
-          <span className="text-2xl">📄</span>
-          <span className="text-sm font-medium">Approve Requests</span>
-        </button>
-
-        {/* ✅ NEW: Request History (needed for “all roles” history requirement) */}
-        <button
-          onClick={() => router.push("/subsystems/leaves/requests/history")}
-          className="glass-btn h-24 flex flex-col items-center justify-center gap-2 hover:bg-white/12 transition-all"
-        >
-          <span className="text-2xl">🕘</span>
-          <span className="text-sm font-medium">Request History</span>
-        </button>
+      <div className="mt-4 text-xs text-white/50">
+        <p>• Draft → Manager still evaluating</p>
+        <p>• Manager Submitted → Sent to HR</p>
+        <p>• HR Published → Final result</p>
       </div>
     </div>
   </div>
 )}
+
 
 
 
